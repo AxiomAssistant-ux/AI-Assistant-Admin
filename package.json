@@ -1,5 +1,5 @@
 {
-  "name": "taploxnext",
+  "name": "Agentic AI HR",
   "version": "0.1.0",
   "private": true,
   "scripts": {
@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "next lint",
     "format": "prettier --write 'src/**/*.{ts,tsx,js,jsx}'"
-    
+
   },
   "dependencies": {
     "@fullcalendar/bootstrap": "^6.1.15",
