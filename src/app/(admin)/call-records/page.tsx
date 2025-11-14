@@ -40,6 +40,24 @@ const CallRecordsPage = () => {
   // Debounced search
   const [debouncedSearch, setDebouncedSearch] = useState('')
 
+  // Column visibility state
+  const [columnVisibility, setColumnVisibility] = useState({
+    rowNumber: true,
+    callerName: true,
+    email: true,
+    phone: true,
+    callTime: true,
+    duration: true,
+    summary: true,
+    status: true,
+    action: true,
+    urgency: true,
+    actions: true
+  })
+
+  const [showColumnMenu, setShowColumnMenu] = useState(false)
+  const [showFilters, setShowFilters] = useState(true)
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery)
@@ -211,6 +229,15 @@ const CallRecordsPage = () => {
     setIsLastPage(false)
   }
 
+  // Clear all filters (not search - search has its own clear button)
+  const clearFilters = () => {
+    setFilter('all')
+    setSort('newest')
+    setTimezone('UTC')
+    setCurrentPage(1)
+    setIsLastPage(false)
+  }
+
   // Sort and paginate summaries
   const sortedAndPaginatedSummaries = useMemo(() => {
     // Determine which data source to use
@@ -336,7 +363,7 @@ const CallRecordsPage = () => {
   return (
     <>
       <style>{`
-        /* Custom scrollbar styling */
+        /* Custom scrollbar styling - horizontal scrollbar visible */
         .table-responsive::-webkit-scrollbar {
           height: 8px;
         }
@@ -353,6 +380,18 @@ const CallRecordsPage = () => {
 
         .table-responsive::-webkit-scrollbar-thumb:hover {
           background: #5a6268;
+        }
+
+        /* Hide vertical scrollbar but keep scrolling functionality */
+        .table-responsive {
+          scrollbar-width: thin;
+          scrollbar-color: #6c757d #f1f1f1;
+          -ms-overflow-style: -ms-autohiding-scrollbar;
+        }
+
+        /* Hide vertical scrollbar in webkit browsers */
+        .table-responsive::-webkit-scrollbar:vertical {
+          width: 0px;
         }
       `}</style>
       <Row>
@@ -376,17 +415,23 @@ const CallRecordsPage = () => {
         <Col xs={12}>
           <Card>
             <CardHeader>
-              <CardTitle as="h5">Call Records</CardTitle>
-              <p className="text-muted mb-0">
-                View and manage all call records with advanced filtering and search capabilities.
-              </p>
-            </CardHeader>
-            <CardBody>
-              {/* Filters and Search */}
-              <Row className="mb-4 g-3">
+              <Row className="align-items-center">
                 <Col md={4}>
-                  <InputGroup className="shadow-sm">
-                    <InputGroup.Text className="bg-white border-end-0">
+                  <CardTitle as="h5" className="mb-0">Call Records</CardTitle>
+                </Col>
+                <Col md={4} className="ms-auto">
+                  <div className="d-flex gap-2 align-items-center">
+                    <Button
+                      variant={showFilters ? "primary" : "outline-secondary"}
+                      className="shadow-sm"
+                      onClick={() => setShowFilters(!showFilters)}
+                      title={showFilters ? "Hide filters" : "Show filters"}
+                      style={{ fontSize: '0.95rem', minWidth: '40px' }}
+                    >
+                      <IconifyIcon icon="solar:filter-outline" width={20} height={20} />
+                    </Button>
+                    <InputGroup className="shadow-sm flex-grow-1">
+                      <InputGroup.Text className="bg-white border-end-0">
                       <IconifyIcon icon="solar:magnifer-outline" width={20} height={20} />
                     </InputGroup.Text>
                     <Form.Control
@@ -394,62 +439,211 @@ const CallRecordsPage = () => {
                       placeholder="Search by name, email, or phone..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
-                      className="border-start-0 ps-0"
-                      style={{ fontSize: '0.95rem' }}
-                    />
+                        className="border-start-0 ps-0"
+                        style={{ fontSize: '0.95rem' }}
+                      />
+                      {searchQuery && (
+                        <InputGroup.Text
+                          className="bg-white border-start-0"
+                          onClick={() => setSearchQuery('')}
+                          style={{ cursor: 'pointer' }}
+                          title="Clear search"
+                        >
+                          <IconifyIcon icon="solar:close-circle-bold" width={18} height={18} style={{ color: '#dc3545' }} />
+                        </InputGroup.Text>
+                      )}
                   </InputGroup>
+                  </div>
                 </Col>
-                <Col md={2}>
+              </Row>
+            </CardHeader>
+            <CardBody>
+              {/* Filters */}
+              {showFilters && (
+              <Row className="mb-4 g-3 align-items-end">
+                <Col md={3}>
+                  <InputGroup className="shadow-sm">
                   <Form.Select
                     value={filter}
                     onChange={(e) => {
                       setFilter(e.target.value as SummaryFilters)
                       setCurrentPage(1)
-                      setIsLastPage(false)
-                    }}
-                    className="shadow-sm"
-                    style={{ fontSize: '0.95rem' }}
-                  >
-                    <option value="all">📋 All Records</option>
-                    <option value="read">✅ Read</option>
-                    <option value="unread">📨 Unread</option>
-                    <option value="urgent">🔥 Urgent</option>
+                        setIsLastPage(false)
+                      }}
+                      className="border-end-0"
+                      style={{ fontSize: '0.95rem' }}
+                    >
+                      <option value="all">📋 All Records</option>
+                      <option value="read">✅ Read</option>
+                      <option value="unread">📨 Unread</option>
+                      <option value="urgent">🔥 Urgent</option>
                   </Form.Select>
+                    {filter !== 'all' && (
+                      <InputGroup.Text
+                        className="bg-white border-start-0"
+                        onClick={() => {
+                          setFilter('all')
+                          setCurrentPage(1)
+                          setIsLastPage(false)
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Clear filter"
+                      >
+                        <IconifyIcon icon="solar:close-circle-bold" width={18} height={18} style={{ color: '#dc3545' }} />
+                      </InputGroup.Text>
+                    )}
+                  </InputGroup>
                 </Col>
-                <Col md={2}>
+                <Col md={3}>
+                  <InputGroup className="shadow-sm">
                   <Form.Select
                     value={sort}
                     onChange={(e) => {
                       setSort(e.target.value as SummarySort)
                       setCurrentPage(1)
-                      setIsLastPage(false)
+                        setIsLastPage(false)
                     }}
-                    className="shadow-sm"
-                    style={{ fontSize: '0.95rem' }}
+                      className="border-end-0"
+                      style={{ fontSize: '0.95rem' }}
                   >
-                    <option value="newest">🔽 Newest First</option>
-                    <option value="oldest">🔼 Oldest First</option>
+                      <option value="newest">🔽 Newest First</option>
+                      <option value="oldest">🔼 Oldest First</option>
                   </Form.Select>
+                    {sort !== 'newest' && (
+                      <InputGroup.Text
+                        className="bg-white border-start-0"
+                        onClick={() => {
+                          setSort('newest')
+                          setCurrentPage(1)
+                          setIsLastPage(false)
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Clear sort"
+                      >
+                        <IconifyIcon icon="solar:close-circle-bold" width={18} height={18} style={{ color: '#dc3545' }} />
+                      </InputGroup.Text>
+                    )}
+                  </InputGroup>
                 </Col>
                 <Col md={3}>
+                  <InputGroup className="shadow-sm">
                   <Form.Select
                     value={timezone}
                     onChange={(e) => {
                       setTimezone(e.target.value as Timezone)
                       setCurrentPage(1)
-                      setIsLastPage(false)
-                    }}
-                    className="shadow-sm"
-                    style={{ fontSize: '0.95rem' }}
-                  >
-                    <option value="UTC">🌍 UTC</option>
-                    <option value="EST">🇺🇸 EST</option>
-                    <option value="CST">🇺🇸 CST</option>
-                    <option value="MST">🇺🇸 MST</option>
-                    <option value="PST">🇺🇸 PST</option>
+                        setIsLastPage(false)
+                      }}
+                      className="border-end-0"
+                      style={{ fontSize: '0.95rem' }}
+                    >
+                      <option value="UTC">🌍 UTC</option>
+                      <option value="EST">🇺🇸 EST</option>
+                      <option value="CST">🇺🇸 CST</option>
+                      <option value="MST">🇺🇸 MST</option>
+                      <option value="PST">🇺🇸 PST</option>
                   </Form.Select>
+                    {timezone !== 'UTC' && (
+                      <InputGroup.Text
+                        className="bg-white border-start-0"
+                        onClick={() => {
+                          setTimezone('UTC')
+                          setCurrentPage(1)
+                          setIsLastPage(false)
+                        }}
+                        style={{ cursor: 'pointer' }}
+                        title="Clear timezone"
+                      >
+                        <IconifyIcon icon="solar:close-circle-bold" width={18} height={18} style={{ color: '#dc3545' }} />
+                      </InputGroup.Text>
+                    )}
+                  </InputGroup>
+                </Col>
+                <Col md="auto" className="ms-auto">
+                  <div className="d-flex gap-2">
+                    <div className="position-relative">
+                      <Button
+                        variant="outline-secondary"
+                        className="shadow-sm"
+                        onClick={() => setShowColumnMenu(!showColumnMenu)}
+                        style={{ fontSize: '0.95rem' }}
+                      >
+                        <IconifyIcon icon="solar:settings-outline" width={18} height={18}  />
+                      </Button>
+                      {showColumnMenu && (
+                        <>
+                          <div
+                            className="position-absolute bg-white border rounded shadow-lg p-3"
+                            style={{
+                              top: '100%',
+                              right: 0,
+                              zIndex: 1000,
+                              minWidth: '200px',
+                              marginTop: '4px'
+                            }}
+                          >
+                            <div className="mb-2 fw-bold" style={{ fontSize: '0.9rem' }}>Show/Hide Columns</div>
+                            {Object.entries({
+                              rowNumber: '#',
+                              callerName: 'Caller Name',
+                              email: 'Email',
+                              phone: 'Phone',
+                              callTime: 'Call Time',
+                              duration: 'Duration',
+                              summary: 'Summary',
+                              status: 'Status',
+                              action: 'Action',
+                              urgency: 'Urgency',
+                              actions: 'Actions'
+                            }).map(([key, label]) => (
+                              <div key={key} className="form-check mb-2">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  checked={columnVisibility[key as keyof typeof columnVisibility]}
+                                  onChange={(e) => {
+                                    setColumnVisibility(prev => ({
+                                      ...prev,
+                                      [key]: e.target.checked
+                                    }))
+                                  }}
+                                  id={`col-${key}`}
+                                />
+                                <label className="form-check-label" htmlFor={`col-${key}`} style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+                                  {label}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                          <div
+                            className="position-fixed"
+                            style={{
+                              top: 0,
+                              left: 0,
+                              right: 0,
+                              bottom: 0,
+                              zIndex: 999
+                            }}
+                            onClick={() => setShowColumnMenu(false)}
+                          />
+                        </>
+                      )}
+                    </div>
+                    {(filter !== 'all' || sort !== 'newest' || timezone !== 'UTC') && (
+                      <Button
+                        variant="outline-danger"
+                        className="shadow-sm"
+                        onClick={clearFilters}
+                        title="Clear all filters"
+                        style={{ fontSize: '0.95rem' }}
+                      >
+                        <IconifyIcon icon="solar:close-circle-bold" width={20} height={20} />
+                      </Button>
+                    )}
+                  </div>
                 </Col>
               </Row>
+              )}
 
               {/* Loading State */}
               {loading && (
@@ -585,8 +779,9 @@ const CallRecordsPage = () => {
                           borderRadius: '6px',
                           boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
                           overflowX: 'auto',
-                          overflowY: 'hidden',
-                          maxWidth: '100%'
+                          overflowY: 'auto',
+                          maxWidth: '100%',
+                          maxHeight: 'calc(100vh - 350px)'
                         }}
                       >
                         <Table hover className="align-middle mb-0" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1650px' }}>
@@ -596,147 +791,170 @@ const CallRecordsPage = () => {
                             borderBottom: '2px solid #dee2e6',
                             position: 'sticky',
                             top: 0,
-                            zIndex: 100
+                            zIndex: 100,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
                           }}>
                             <tr>
-                              <th
-                                style={{
-                                  width: '60px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                                className="text-center"
-                              >
-                                #
-                              </th>
-                              <th
-                                style={{
-                                  width: '150px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                              >
+                              {columnVisibility.rowNumber && (
+                                <th
+                                  style={{
+                                    width: '60px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                  className="text-center"
+                                >
+                                  #
+                                </th>
+                              )}
+                              {columnVisibility.callerName && (
+                                <th
+                                  style={{
+                                    width: '150px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
                                   Caller Name
                               </th>
-                              <th
-                                style={{
-                                  width: '200px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                              >
+                              )}
+                              {columnVisibility.email && (
+                                <th
+                                  style={{
+                                    width: '200px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
                                   Email
                               </th>
-                              <th
-                                style={{
-                                  width: '130px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                              >
+                              )}
+                              {columnVisibility.phone && (
+                                <th
+                                  style={{
+                                    width: '130px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
                                   Phone
                               </th>
-                              <th
-                                style={{
-                                  width: '200px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                              >
+                              )}
+                              {columnVisibility.callTime && (
+                                <th
+                                  style={{
+                                    width: '200px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
                                   Call Time
                               </th>
-                              <th
-                                style={{
-                                  width: '120px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                                className="text-center"
-                              >
+                              )}
+                              {columnVisibility.duration && (
+                                <th
+                                  style={{
+                                    width: '120px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                  className="text-center"
+                                >
                                   Duration
                               </th>
-                              <th
-                                style={{
-                                  width: '250px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                              >
+                              )}
+                              {columnVisibility.summary && (
+                                <th
+                                  style={{
+                                    width: '250px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                >
                                   Summary
                               </th>
-                              <th
-                                style={{
-                                  width: '120px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                                className="text-center"
-                              >
-                                Status
+                              )}
+                              {columnVisibility.status && (
+                                <th
+                                  style={{
+                                    width: '120px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                  className="text-center"
+                                >
+                                  Status
                               </th>
-                              <th
-                                style={{
-                                  width: '120px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                                className="text-center"
-                              >
+                              )}
+                              {columnVisibility.action && (
+                                <th
+                                  style={{
+                                    width: '120px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                  className="text-center"
+                                >
                                   Action
                               </th>
-                              <th
-                                style={{
-                                  width: '100px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                                className="text-center"
-                              >
+                              )}
+                              {columnVisibility.urgency && (
+                                <th
+                                  style={{
+                                    width: '100px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                  className="text-center"
+                                >
                                   Urgency
+                                </th>
+                              )}
+                              {columnVisibility.actions && (
+                                <th
+                                  style={{
+                                    width: '150px',
+                                    borderBottom: 'none',
+                                    padding: '1rem 0.75rem',
+                                    fontWeight: '600',
+                                    fontSize: '0.85rem',
+                                    letterSpacing: '0.5px'
+                                  }}
+                                  className="text-center"
+                                >
+                                  Actions
                               </th>
-                              <th
-                                style={{
-                                  width: '150px',
-                                  borderBottom: 'none',
-                                  padding: '1rem 0.75rem',
-                                  fontWeight: '600',
-                                  fontSize: '0.85rem',
-                                  letterSpacing: '0.5px'
-                                }}
-                                className="text-center"
-                              >
-                                Actions
-                              </th>
+                              )}
                             </tr>
                           </thead>
                           <tbody>
@@ -747,86 +965,107 @@ const CallRecordsPage = () => {
                                   borderBottom: '1px solid #dee2e6'
                                 }}
                               >
-                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
-                                  <span className="text-muted">
-                                    {(currentPage - 1) * pageSize + index + 1}
-                                  </span>
+                                {columnVisibility.rowNumber && (
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                    <span className="text-muted">
+                                      {(currentPage - 1) * pageSize + index + 1}
+                                    </span>
                                 </td>
-                                <td style={{ padding: '1rem 0.75rem' }}>
-                                  <span className="fw-medium">
-                                    {summary['Caller Name'] || <span className="text-muted fst-italic">N/A</span>}
-                                  </span>
+                                )}
+                                {columnVisibility.callerName && (
+                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                    <span className="fw-medium">
+                                      {summary['Caller Name'] || <span className="text-muted fst-italic">N/A</span>}
+                                    </span>
                                 </td>
-                                <td style={{ padding: '1rem 0.75rem' }}>
+                                )}
+                                {columnVisibility.email && (
+                                  <td style={{ padding: '1rem 0.75rem' }}>
                                   <div className="text-truncate" style={{ maxWidth: '200px' }} title={summary['Caller Email'] || ''}>
-                                    {summary['Caller Email'] || <span className="text-muted fst-italic">N/A</span>}
+                                      {summary['Caller Email'] || <span className="text-muted fst-italic">N/A</span>}
                                   </div>
                                 </td>
-                                <td style={{ padding: '1rem 0.75rem' }}>
-                                  {summary['Caller Number'] || <span className="text-muted fst-italic">N/A</span>}
-                                </td>
-                                <td style={{ padding: '1rem 0.75rem', fontSize: '0.9rem' }}>
+                                )}
+                                {columnVisibility.phone && (
+                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                    {summary['Caller Number'] || <span className="text-muted fst-italic">N/A</span>}
+                                  </td>
+                                )}
+                                {columnVisibility.callTime && (
+                                  <td style={{ padding: '1rem 0.75rem', fontSize: '0.9rem' }}>
                                     {summary['Call timing'] || summary['Call Timing'] ? (
-                                    <span>{formatCallTime(summary['Call timing'] || summary['Call Timing'])}</span>
-                                  ) : (
-                                    <span className="text-muted fst-italic">N/A</span>
-                                  )}
+                                      <span>{formatCallTime(summary['Call timing'] || summary['Call Timing'])}</span>
+                                    ) : (
+                                      <span className="text-muted fst-italic">N/A</span>
+                                    )}
                                 </td>
-                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                )}
+                                {columnVisibility.duration && (
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['Duration'] ? (
-                                    <Badge bg="info" className="px-2 py-1">{summary['Duration']}</Badge>
+                                      <Badge bg="info" className="px-2 py-1">{summary['Duration']}</Badge>
                                   ) : (
-                                    <span className="text-muted fst-italic">N/A</span>
+                                      <span className="text-muted fst-italic">N/A</span>
                                   )}
                                 </td>
-                                <td style={{ padding: '1rem 0.75rem' }}>
-                                  <div
-                                    className="text-truncate"
-                                    style={{
-                                      maxWidth: '250px',
-                                      fontSize: '0.9rem',
-                                      color: '#4b5563',
-                                      lineHeight: '1.5'
-                                    }}
-                                    title={summary['Brief Summary'] || ''}
-                                  >
+                                )}
+                                {columnVisibility.summary && (
+                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                    <div
+                                      className="text-truncate"
+                                      style={{
+                                        maxWidth: '250px',
+                                        fontSize: '0.9rem',
+                                        color: '#4b5563',
+                                        lineHeight: '1.5'
+                                      }}
+                                      title={summary['Brief Summary'] || ''}
+                                    >
                                     {summary['Brief Summary']
                                       ? (summary['Brief Summary'].length > 80
                                         ? summary['Brief Summary'].substring(0, 80) + '...'
                                         : summary['Brief Summary'])
-                                      : <span className="text-muted fst-italic">No summary available</span>}
+                                        : <span className="text-muted fst-italic">No summary available</span>}
                                   </div>
                                 </td>
-                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                )}
+                                {columnVisibility.status && (
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['View_Status'] ? (
-                                    <Badge bg="success" className="px-2 py-1">Read</Badge>
+                                      <Badge bg="success" className="px-2 py-1">Read</Badge>
                                   ) : (
-                                    <Badge bg="warning" text="dark" className="px-2 py-1">Unread</Badge>
+                                      <Badge bg="warning" text="dark" className="px-2 py-1">Unread</Badge>
                                   )}
                                 </td>
-                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                )}
+                                {columnVisibility.action && (
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['Action_flag'] ? (
-                                    <Badge
-                                      bg={summary['Action_status'] === 'Done' ? 'success' : 'danger'}
-                                      className="px-2 py-1"
-                                    >
+                                      <Badge
+                                        bg={summary['Action_status'] === 'Done' ? 'success' : 'danger'}
+                                        className="px-2 py-1"
+                                      >
                                       {summary['Action_status'] || 'Pending'}
                                     </Badge>
                                   ) : (
-                                    <Badge bg="secondary" className="px-2 py-1">None</Badge>
+                                      <Badge bg="secondary" className="px-2 py-1">None</Badge>
                                   )}
                                 </td>
-                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                )}
+                                {columnVisibility.urgency && (
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['Urgency'] ? (
-                                    <Badge bg="danger" className="px-2 py-1">Urgent</Badge>
+                                      <Badge bg="danger" className="px-2 py-1">Urgent</Badge>
                                   ) : (
-                                    <Badge bg="secondary" className="px-2 py-1">Normal</Badge>
+                                      <Badge bg="secondary" className="px-2 py-1">Normal</Badge>
                                   )}
                                 </td>
-                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                )}
+                                {columnVisibility.actions && (
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   <div className="d-flex gap-2 justify-content-center">
                                     <Button
-                                      variant="primary"
+                                        variant="primary"
                                       size="sm"
                                       onClick={() => handleViewDetails(summary)}
                                       title="View Details"
@@ -835,7 +1074,7 @@ const CallRecordsPage = () => {
                                     </Button>
                                     {summary['Recording Link'] && (
                                       <Button
-                                        variant="success"
+                                          variant="success"
                                         size="sm"
                                         as="a"
                                         href={summary['Recording Link']}
@@ -848,6 +1087,7 @@ const CallRecordsPage = () => {
                                     )}
                                   </div>
                                 </td>
+                                )}
                               </tr>
                             ))}
                           </tbody>
