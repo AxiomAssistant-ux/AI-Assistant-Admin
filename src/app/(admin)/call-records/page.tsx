@@ -58,6 +58,36 @@ const CallRecordsPage = () => {
   const [showColumnMenu, setShowColumnMenu] = useState(false)
   const [showFilters, setShowFilters] = useState(true)
 
+  // Column sticky state
+  const [stickyColumns, setStickyColumns] = useState({
+    rowNumber: false,
+    callerName: false,
+    email: false,
+    phone: false,
+    callTime: false,
+    duration: false,
+    summary: false,
+    status: false,
+    action: false,
+    urgency: false,
+    actions: false
+  })
+
+  // Column widths for calculating sticky positions
+  const columnWidths: Record<string, number> = {
+    rowNumber: 60,
+    callerName: 150,
+    email: 200,
+    phone: 130,
+    callTime: 200,
+    duration: 120,
+    summary: 250,
+    status: 120,
+    action: 120,
+    urgency: 100,
+    actions: 150
+  }
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery)
@@ -236,6 +266,38 @@ const CallRecordsPage = () => {
     setTimezone('UTC')
     setCurrentPage(1)
     setIsLastPage(false)
+  }
+
+  // Calculate left offset for sticky columns
+  const getStickyLeft = (columnKey: string): number => {
+    const columnOrder = ['rowNumber', 'callerName', 'email', 'phone', 'callTime', 'duration', 'summary', 'status', 'action', 'urgency', 'actions']
+    const currentIndex = columnOrder.indexOf(columnKey)
+    let left = 0
+
+    for (let i = 0; i < currentIndex; i++) {
+      const prevKey = columnOrder[i]
+      if (columnVisibility[prevKey as keyof typeof columnVisibility] && stickyColumns[prevKey as keyof typeof stickyColumns]) {
+        left += columnWidths[prevKey] || 0
+      }
+    }
+
+    return left
+  }
+
+  // Get sticky styles for a column
+  const getStickyStyles = (columnKey: string, isHeader: boolean = false) => {
+    const isSticky = stickyColumns[columnKey as keyof typeof stickyColumns]
+    if (!isSticky) return {}
+
+    const left = getStickyLeft(columnKey)
+    return {
+      position: 'sticky' as const,
+      left: `${left}px`,
+      zIndex: isHeader ? 101 : 1,
+      backgroundColor: isHeader
+        ? 'var(--bs-table-bg, var(--bs-body-tertiary-bg, #f8f9fa))'
+        : 'var(--bs-body-bg, #ffffff)'
+    }
   }
 
   // Sort and paginate summaries
@@ -594,7 +656,7 @@ const CallRecordsPage = () => {
                               marginTop: '4px'
                             }}
                           >
-                          <div className="mb-2 fw-bold" style={{ fontSize: '0.9rem' }}>Show/Hide Columns</div>
+                          <div className="mb-2 fw-bold" style={{ fontSize: '0.9rem' }}>Column Settings</div>
                           <div className="form-check mb-3 pb-2 border-bottom">
                             <input
                               className="form-check-input"
@@ -635,22 +697,52 @@ const CallRecordsPage = () => {
                             urgency: 'Urgency',
                             actions: 'Actions'
                           }).map(([key, label]) => (
-                            <div key={key} className="form-check mb-2">
-                              <input
-                                className="form-check-input"
-                                type="checkbox"
-                                checked={columnVisibility[key as keyof typeof columnVisibility]}
-                                onChange={(e) => {
-                                  setColumnVisibility(prev => ({
-                                    ...prev,
-                                    [key]: e.target.checked
-                                  }))
-                                }}
-                                id={`col-${key}`}
-                              />
-                              <label className="form-check-label" htmlFor={`col-${key}`} style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
-                                {label}
-                              </label>
+                            <div key={key} className="mb-3 pb-2 border-bottom">
+                              <div className="form-check mb-2">
+                                <input
+                                  className="form-check-input"
+                                  type="checkbox"
+                                  checked={columnVisibility[key as keyof typeof columnVisibility]}
+                                  onChange={(e) => {
+                                    const isChecked = e.target.checked
+                                    setColumnVisibility(prev => ({
+                                      ...prev,
+                                      [key]: isChecked
+                                    }))
+                                    // Reset sticky state when column is hidden
+                                    if (!isChecked) {
+                                      setStickyColumns(prev => ({
+                                        ...prev,
+                                        [key]: false
+                                      }))
+                                    }
+                                  }}
+                                  id={`col-${key}`}
+                                />
+                                <label className="form-check-label" htmlFor={`col-${key}`} style={{ fontSize: '0.9rem', cursor: 'pointer' }}>
+                                  {label}
+                                </label>
+                              </div>
+                              {columnVisibility[key as keyof typeof columnVisibility] && (
+                                <div className="form-check">
+                                  <input
+                                    className="form-check-input"
+                                    type="checkbox"
+                                    checked={stickyColumns[key as keyof typeof stickyColumns]}
+                                    onChange={(e) => {
+                                      setStickyColumns(prev => ({
+                                        ...prev,
+                                        [key]: e.target.checked
+                                      }))
+                                    }}
+                                    id={`sticky-${key}`}
+                                  />
+                                  <label className="form-check-label text-muted" htmlFor={`sticky-${key}`} style={{ fontSize: '0.85rem', cursor: 'pointer' }}>
+                                    <IconifyIcon icon="solar:pin-outline" width={14} height={14} className="me-1" />
+                                    Sticky
+                                  </label>
+                                </div>
+                              )}
                             </div>
                           ))}
                         </div>
@@ -827,7 +919,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('rowNumber', true)
                                   }}
                                   className="text-center"
                                 >
@@ -842,7 +935,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('callerName', true)
                                   }}
                                 >
                                   Caller Name
@@ -856,7 +950,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('email', true)
                                   }}
                                 >
                                   Email
@@ -870,7 +965,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('phone', true)
                                   }}
                                 >
                                   Phone
@@ -884,7 +980,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('callTime', true)
                                   }}
                                 >
                                   Call Time
@@ -898,7 +995,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('duration', true)
                                   }}
                                   className="text-center"
                                 >
@@ -913,7 +1011,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('summary', true)
                                   }}
                                 >
                                   Summary
@@ -927,7 +1026,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('status', true)
                                   }}
                                   className="text-center"
                                 >
@@ -942,7 +1042,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('action', true)
                                   }}
                                   className="text-center"
                                 >
@@ -957,12 +1058,13 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('urgency', true)
                                   }}
                                   className="text-center"
                                 >
                                   Urgency
-                                </th>
+                              </th>
                               )}
                               {columnVisibility.actions && (
                                 <th
@@ -972,7 +1074,8 @@ const CallRecordsPage = () => {
                                     padding: '1rem 0.75rem',
                                     fontWeight: '600',
                                     fontSize: '0.85rem',
-                                    letterSpacing: '0.5px'
+                                    letterSpacing: '0.5px',
+                                    ...getStickyStyles('actions', true)
                                   }}
                                   className="text-center"
                                 >
@@ -990,42 +1093,42 @@ const CallRecordsPage = () => {
                                 }}
                               >
                                 {columnVisibility.rowNumber && (
-                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem', ...getStickyStyles('rowNumber', false) }}>
                                     <span className="text-muted">
                                       {(currentPage - 1) * pageSize + index + 1}
                                     </span>
-                                </td>
+                                  </td>
                                 )}
                                 {columnVisibility.callerName && (
-                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                  <td style={{ padding: '1rem 0.75rem', ...getStickyStyles('callerName', false) }}>
                                     <span className="fw-medium">
                                       {summary['Caller Name'] || <span className="text-muted fst-italic">N/A</span>}
                                     </span>
-                                </td>
+                                  </td>
                                 )}
                                 {columnVisibility.email && (
-                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                  <td style={{ padding: '1rem 0.75rem', ...getStickyStyles('email', false) }}>
                                   <div className="text-truncate" style={{ maxWidth: '200px' }} title={summary['Caller Email'] || ''}>
                                       {summary['Caller Email'] || <span className="text-muted fst-italic">N/A</span>}
                                   </div>
                                 </td>
                                 )}
                                 {columnVisibility.phone && (
-                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                  <td style={{ padding: '1rem 0.75rem', ...getStickyStyles('phone', false) }}>
                                     {summary['Caller Number'] || <span className="text-muted fst-italic">N/A</span>}
                                   </td>
                                 )}
                                 {columnVisibility.callTime && (
-                                  <td style={{ padding: '1rem 0.75rem', fontSize: '0.9rem' }}>
+                                  <td style={{ padding: '1rem 0.75rem', fontSize: '0.9rem', ...getStickyStyles('callTime', false) }}>
                                     {summary['Call timing'] || summary['Call Timing'] ? (
                                       <span>{formatCallTime(summary['Call timing'] || summary['Call Timing'])}</span>
                                     ) : (
                                       <span className="text-muted fst-italic">N/A</span>
                                     )}
-                                </td>
+                                  </td>
                                 )}
                                 {columnVisibility.duration && (
-                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem', ...getStickyStyles('duration', false) }}>
                                   {summary['Duration'] ? (
                                       <Badge bg="info" className="px-2 py-1">{summary['Duration']}</Badge>
                                   ) : (
@@ -1034,7 +1137,7 @@ const CallRecordsPage = () => {
                                 </td>
                                 )}
                                 {columnVisibility.summary && (
-                                  <td style={{ padding: '1rem 0.75rem' }}>
+                                  <td style={{ padding: '1rem 0.75rem', ...getStickyStyles('summary', false) }}>
                                     <div
                                       className="text-truncate"
                                       style={{
@@ -1054,7 +1157,7 @@ const CallRecordsPage = () => {
                                 </td>
                                 )}
                                 {columnVisibility.status && (
-                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem', ...getStickyStyles('status', false) }}>
                                   {summary['View_Status'] ? (
                                       <Badge bg="success" className="px-2 py-1">Read</Badge>
                                   ) : (
@@ -1063,7 +1166,7 @@ const CallRecordsPage = () => {
                                 </td>
                                 )}
                                 {columnVisibility.action && (
-                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem', ...getStickyStyles('action', false) }}>
                                   {summary['Action_flag'] ? (
                                       <Badge
                                         bg={summary['Action_status'] === 'Done' ? 'success' : 'danger'}
@@ -1077,7 +1180,7 @@ const CallRecordsPage = () => {
                                 </td>
                                 )}
                                 {columnVisibility.urgency && (
-                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem', ...getStickyStyles('urgency', false) }}>
                                   {summary['Urgency'] ? (
                                       <Badge bg="danger" className="px-2 py-1">Urgent</Badge>
                                   ) : (
@@ -1086,7 +1189,7 @@ const CallRecordsPage = () => {
                                 </td>
                                 )}
                                 {columnVisibility.actions && (
-                                  <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <td className="text-center" style={{ padding: '1rem 0.75rem', ...getStickyStyles('actions', false) }}>
                                   <div className="d-flex gap-2 justify-content-center">
                                     <Button
                                         variant="primary"
