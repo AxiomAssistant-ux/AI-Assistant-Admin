@@ -319,7 +319,7 @@ const CallRecordsPage = () => {
     if (!isSticky) return {}
 
     const isRightSticky = rightStickyColumns.includes(columnKey)
-    
+
     if (isRightSticky) {
       // Stick to the right
       const right = getStickyRight(columnKey)
@@ -327,8 +327,8 @@ const CallRecordsPage = () => {
         position: 'sticky' as const,
         right: `${right}px`,
         zIndex: isHeader ? 102 : 100,
-        boxShadow: isHeader 
-          ? 'none' 
+        boxShadow: isHeader
+          ? 'none'
           : '-2px 0 4px rgba(0,0,0,0.1)',
         isolation: 'isolate' as const
       }
@@ -339,8 +339,8 @@ const CallRecordsPage = () => {
         position: 'sticky' as const,
         left: `${left}px`,
         zIndex: isHeader ? 102 : 100,
-        boxShadow: isHeader 
-          ? 'none' 
+        boxShadow: isHeader
+          ? 'none'
           : '2px 0 4px rgba(0,0,0,0.1)',
         isolation: 'isolate' as const
       }
@@ -1003,8 +1003,9 @@ const CallRecordsPage = () => {
                           <thead className="table-light" style={{
                             position: 'sticky',
                             top: 0,
-                            zIndex: 100,
-                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                            zIndex: 101,
+                            boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                            backgroundColor: 'var(--bs-body-tertiary-bg, #f8f9fa)'
                           }}>
                             <tr>
                               {columnVisibility.rowNumber && (
