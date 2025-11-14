@@ -84,10 +84,14 @@ const CallRecordsPage = () => {
         setIsLastPage(true)
         setTotalCount(0)
       } else if (response.data) {
+        // Handle new response format with summaries and total
+        const summariesData = response.data.summaries
+        const totalFromBackend = response.data.total
+
         if (shouldFetchAll) {
           // Store all data for client-side sorting and pagination
-          setAllSummaries(response.data)
-          setTotalCount(response.data.length)
+          setAllSummaries(summariesData)
+          setTotalCount(totalFromBackend)
           setHasMore(false) // We fetched all available data
           setIsLastPage(true) // We have all data, so we're effectively on the last page
         } else {
@@ -95,7 +99,7 @@ const CallRecordsPage = () => {
 
           // If we got 0 items and we're not on page 1, we've gone too far
           // This means the previous page was actually the last page
-          if (response.data.length === 0 && currentPage > 1) {
+          if (summariesData.length === 0 && currentPage > 1) {
             // Fetch the previous page's data immediately
             const previousPage = currentPage - 1
             try {
@@ -109,12 +113,14 @@ const CallRecordsPage = () => {
               })
 
               if (prevResponse.data) {
-                setSummaries(prevResponse.data)
+                const prevSummaries = prevResponse.data.summaries
+                const prevTotal = prevResponse.data.total
+                setSummaries(prevSummaries)
                 setAllSummaries([])
                 setCurrentPage(previousPage)
                 setIsLastPage(true)
                 setHasMore(false)
-                setTotalCount((previousPage - 1) * pageSize + prevResponse.data.length)
+                setTotalCount(prevTotal)
               } else {
                 // Fallback: just set state and let effect handle it
                 setCurrentPage(previousPage)
@@ -135,52 +141,21 @@ const CallRecordsPage = () => {
             return
           }
 
-          setSummaries(response.data)
+          setSummaries(summariesData)
           setAllSummaries([])
 
-          // Determine if we're on the last page
-          const gotFullPage = response.data.length === pageSize
-          let isLast = false
-          let hasMoreData = false
-
-          // If we got exactly pageSize items, check if there's a next page
-          if (gotFullPage) {
-            // Make a peek request to see if there's more data
-            try {
-              const peekResponse = await summaryApi.getUserSummaries(token, {
-                skip: currentPage * pageSize,
-                limit: 1, // Just check if there's at least 1 more item
-                search: debouncedSearch || undefined,
-                filter: filter !== 'all' ? filter : undefined,
-                sort,
-                tz: timezone,
-              })
-
-              hasMoreData = peekResponse.data && peekResponse.data.length > 0
-              isLast = !hasMoreData
-            } catch (peekErr) {
-              // If peek fails, assume there's more (conservative approach)
-              isLast = false
-              hasMoreData = true
-            }
-          } else {
-            // We got fewer than pageSize items, so we're definitely on the last page
-            isLast = true
-            hasMoreData = false
+          // Set the exact total count from backend
+          if (totalFromBackend !== undefined) {
+            setTotalCount(totalFromBackend)
           }
+
+          // Determine if we're on the last page
+          const currentRecordCount = (currentPage - 1) * pageSize + summariesData.length
+          const isLast = totalFromBackend !== undefined && currentRecordCount >= totalFromBackend
+          const hasMoreData = totalFromBackend !== undefined && currentRecordCount < totalFromBackend
 
           setIsLastPage(isLast)
           setHasMore(hasMoreData)
-
-          // Calculate total count
-          if (isLast) {
-            // We're on the last page, so we know the exact total
-            setTotalCount((currentPage - 1) * pageSize + response.data.length)
-          } else {
-            // We got a full page, so there's at least this many records
-            // We don't know the exact total, so we'll show a minimum estimate
-            setTotalCount(Math.max(totalCount, currentPage * pageSize))
-          }
         }
       }
     } catch (err) {
@@ -1163,23 +1138,23 @@ const CallRecordsPage = () => {
                       {/* Pagination */}
                       <Row className="mt-4 pt-3 border-top">
                         <Col sm={6} className="mb-3 mb-sm-0">
-                        <div className="d-flex align-items-center gap-2">
-                          <span className="text-muted">Rows per page:</span>
-                          <Form.Select
-                            value={pageSize}
-                            onChange={(e) => handlePageSizeChange(Number(e.target.value))}
+                          <div className="d-flex align-items-center gap-2">
+                            <span className="text-muted">Rows per page:</span>
+                            <Form.Select
+                              value={pageSize}
+                              onChange={(e) => handlePageSizeChange(Number(e.target.value))}
                               style={{ width: 'auto', minWidth: '70px' }}
-                            size="sm"
-                          >
-                            <option value={10}>10</option>
-                            <option value={25}>25</option>
-                            <option value={50}>50</option>
-                            <option value={100}>100</option>
-                          </Form.Select>
+                              size="sm"
+                            >
+                              <option value={10}>10</option>
+                              <option value={25}>25</option>
+                              <option value={50}>50</option>
+                              <option value={100}>100</option>
+                            </Form.Select>
                             <span className="text-muted ms-2">
-                              Showing {startRecord}-{endRecord} of {typeof totalRecords === 'string' ? totalRecords : totalRecords}
+                              Showing {sortedAndPaginatedSummaries.length} of {typeof totalRecords === 'string' ? totalRecords.replace('+', '') : totalRecords.toLocaleString()} records
                             </span>
-                        </div>
+                          </div>
                         </Col>
                         <Col sm={6}>
                           <ul className="pagination pagination-rounded justify-content-sm-end m-0">
