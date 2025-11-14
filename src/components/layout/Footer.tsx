@@ -7,8 +7,8 @@ const Footer = () => {
     <footer className=" footer card mb-0 rounded-0 justify-content-center align-items-center ">
       <div className="container-fluid">
         <Row>
-          <Col xs={12} className=" text-center">
-            <p className="mb-0">{currentYear} © Taplox.</p>
+          <Col xs={12} className=" text-end">
+            <p className="mb-0">{currentYear} © Axiom</p>
           </Col>
         </Row>
       </div>
