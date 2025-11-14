@@ -30,6 +30,7 @@ const CallRecordsPage = () => {
   const [pageSize, setPageSize] = useState(10)
   const [totalCount, setTotalCount] = useState(0)
   const [hasMore, setHasMore] = useState(false) // Track if there's more data available
+  const [isLastPage, setIsLastPage] = useState(false) // Track if we're on the last page
   const [allSummaries, setAllSummaries] = useState<SummaryOut[]>([]) // Store all fetched summaries for client-side sorting
 
   // Detail modal state
@@ -43,6 +44,7 @@ const CallRecordsPage = () => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery)
       setCurrentPage(1) // Reset to first page on search
+      setIsLastPage(false) // Reset last page status
     }, 500)
 
     return () => clearTimeout(timer)
@@ -79,29 +81,105 @@ const CallRecordsPage = () => {
         setSummaries([])
         setAllSummaries([])
         setHasMore(false)
+        setIsLastPage(true)
+        setTotalCount(0)
       } else if (response.data) {
         if (shouldFetchAll) {
           // Store all data for client-side sorting and pagination
           setAllSummaries(response.data)
           setTotalCount(response.data.length)
           setHasMore(false) // We fetched all available data
+          setIsLastPage(true) // We have all data, so we're effectively on the last page
         } else {
           // Use server-side pagination
+
+          // If we got 0 items and we're not on page 1, we've gone too far
+          // This means the previous page was actually the last page
+          if (response.data.length === 0 && currentPage > 1) {
+            // Fetch the previous page's data immediately
+            const previousPage = currentPage - 1
+            try {
+              const prevResponse = await summaryApi.getUserSummaries(token, {
+                skip: (previousPage - 1) * pageSize,
+                limit: pageSize,
+                search: debouncedSearch || undefined,
+                filter: filter !== 'all' ? filter : undefined,
+                sort,
+                tz: timezone,
+              })
+
+              if (prevResponse.data) {
+                setSummaries(prevResponse.data)
+                setAllSummaries([])
+                setCurrentPage(previousPage)
+                setIsLastPage(true)
+                setHasMore(false)
+                setTotalCount((previousPage - 1) * pageSize + prevResponse.data.length)
+              } else {
+                // Fallback: just set state and let effect handle it
+                setCurrentPage(previousPage)
+                setIsLastPage(true)
+                setHasMore(false)
+                setSummaries([])
+                setAllSummaries([])
+              }
+            } catch (prevErr) {
+              // Fallback: just set state and let effect handle it
+              setCurrentPage(previousPage)
+              setIsLastPage(true)
+              setHasMore(false)
+              setSummaries([])
+              setAllSummaries([])
+            }
+            setLoading(false)
+            return
+          }
+
           setSummaries(response.data)
           setAllSummaries([])
 
-          // Check if there's more data (if we got a full page, there might be more)
+          // Determine if we're on the last page
           const gotFullPage = response.data.length === pageSize
-          setHasMore(gotFullPage)
+          let isLast = false
+          let hasMoreData = false
 
-          // Calculate total count more accurately
+          // If we got exactly pageSize items, check if there's a next page
           if (gotFullPage) {
-            // If we got a full page, there's likely more data
-            // Set total to at least current page * pageSize + 1 to indicate more exists
-            setTotalCount(Math.max(totalCount, currentPage * pageSize + 1))
+            // Make a peek request to see if there's more data
+            try {
+              const peekResponse = await summaryApi.getUserSummaries(token, {
+                skip: currentPage * pageSize,
+                limit: 1, // Just check if there's at least 1 more item
+                search: debouncedSearch || undefined,
+                filter: filter !== 'all' ? filter : undefined,
+                sort,
+                tz: timezone,
+              })
+
+              hasMoreData = peekResponse.data && peekResponse.data.length > 0
+              isLast = !hasMoreData
+            } catch (peekErr) {
+              // If peek fails, assume there's more (conservative approach)
+              isLast = false
+              hasMoreData = true
+            }
           } else {
-            // We got less than a full page, so this is the last page
+            // We got fewer than pageSize items, so we're definitely on the last page
+            isLast = true
+            hasMoreData = false
+          }
+
+          setIsLastPage(isLast)
+          setHasMore(hasMoreData)
+
+          // Calculate total count
+          if (isLast) {
+            // We're on the last page, so we know the exact total
             setTotalCount((currentPage - 1) * pageSize + response.data.length)
+          } else {
+            // We got a full page, so there's at least this many records
+            // We don't know the exact total, so we'll show a minimum estimate
+            setTotalCount(Math.max(totalCount, currentPage * pageSize))
           }
         }
       }
@@ -110,6 +188,8 @@ const CallRecordsPage = () => {
       setSummaries([])
       setAllSummaries([])
       setHasMore(false)
+      setIsLastPage(true)
+      setTotalCount(0)
     } finally {
       setLoading(false)
     }
@@ -135,6 +215,7 @@ const CallRecordsPage = () => {
       setSortDirection('asc')
     }
     setCurrentPage(1) // Reset to first page when sorting changes
+    setIsLastPage(false) // Reset last page status
   }
 
   // Clear sorting (when needed)
@@ -142,6 +223,7 @@ const CallRecordsPage = () => {
     setSortColumn(null)
     setSortDirection('asc')
     setCurrentPage(1)
+    setIsLastPage(false)
   }
 
   // Sort and paginate summaries
@@ -212,6 +294,7 @@ const CallRecordsPage = () => {
   const handlePageSizeChange = (newSize: number) => {
     setPageSize(newSize)
     setCurrentPage(1)
+    setIsLastPage(false) // Reset last page status when page size changes
   }
 
   const handleFirstPage = () => {
@@ -229,8 +312,9 @@ const CallRecordsPage = () => {
       }
     } else {
       // For server-side pagination, we can't jump to last page directly
-      // Instead, keep going to next page until we reach the end
-      if (hasMore) {
+      // This button should be disabled for server-side pagination
+      // But if somehow called, just go to next page if available
+      if (hasMore && !isLastPage) {
         handlePageChange(currentPage + 1)
       }
     }
@@ -240,12 +324,12 @@ const CallRecordsPage = () => {
   const effectiveTotalCount = sortColumn ? allSummaries.length : totalCount
   const totalPages = sortColumn
     ? Math.ceil(effectiveTotalCount / pageSize)
-    : (hasMore ? currentPage + 1 : currentPage) // For server-side, estimate based on hasMore
+    : (isLastPage ? currentPage : currentPage + 1) // For server-side, use current page if last, otherwise estimate
   const startRecord = sortedAndPaginatedSummaries.length > 0 ? (currentPage - 1) * pageSize + 1 : 0
   const endRecord = (currentPage - 1) * pageSize + sortedAndPaginatedSummaries.length
   const totalRecords = sortColumn
     ? effectiveTotalCount
-    : (hasMore ? `${totalCount}+` : totalCount) // Show "+" if there's more data
+    : (isLastPage ? totalCount : `${totalCount}+`) // Show "+" if there's more data
 
   if (!isAuthenticated) {
     return (
@@ -266,6 +350,26 @@ const CallRecordsPage = () => {
 
   return (
     <>
+      <style>{`
+        /* Custom scrollbar styling */
+        .table-responsive::-webkit-scrollbar {
+          height: 8px;
+        }
+
+        .table-responsive::-webkit-scrollbar-track {
+          background: #f1f1f1;
+          border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb {
+          background: #6c757d;
+          border-radius: 4px;
+        }
+
+        .table-responsive::-webkit-scrollbar-thumb:hover {
+          background: #5a6268;
+        }
+      `}</style>
       <Row>
         <Col xs={12}>
           <div className="page-title-box">
@@ -294,10 +398,10 @@ const CallRecordsPage = () => {
             </CardHeader>
             <CardBody>
               {/* Filters and Search */}
-              <Row className="mb-3">
+              <Row className="mb-4 g-3">
                 <Col md={4}>
-                  <InputGroup>
-                    <InputGroup.Text>
+                  <InputGroup className="shadow-sm">
+                    <InputGroup.Text className="bg-white border-end-0">
                       <IconifyIcon icon="solar:magnifer-outline" width={20} height={20} />
                     </InputGroup.Text>
                     <Form.Control
@@ -305,6 +409,8 @@ const CallRecordsPage = () => {
                       placeholder="Search by name, email, or phone..."
                       value={searchQuery}
                       onChange={(e) => setSearchQuery(e.target.value)}
+                      className="border-start-0 ps-0"
+                      style={{ fontSize: '0.95rem' }}
                     />
                   </InputGroup>
                 </Col>
@@ -314,12 +420,15 @@ const CallRecordsPage = () => {
                     onChange={(e) => {
                       setFilter(e.target.value as SummaryFilters)
                       setCurrentPage(1)
+                      setIsLastPage(false)
                     }}
+                    className="shadow-sm"
+                    style={{ fontSize: '0.95rem' }}
                   >
-                    <option value="all">All Records</option>
-                    <option value="read">Read</option>
-                    <option value="unread">Unread</option>
-                    <option value="urgent">Urgent</option>
+                    <option value="all">📋 All Records</option>
+                    <option value="read">✅ Read</option>
+                    <option value="unread">📨 Unread</option>
+                    <option value="urgent">🔥 Urgent</option>
                   </Form.Select>
                 </Col>
                 <Col md={2}>
@@ -328,10 +437,13 @@ const CallRecordsPage = () => {
                     onChange={(e) => {
                       setSort(e.target.value as SummarySort)
                       setCurrentPage(1)
+                      setIsLastPage(false)
                     }}
+                    className="shadow-sm"
+                    style={{ fontSize: '0.95rem' }}
                   >
-                    <option value="newest">Newest First</option>
-                    <option value="oldest">Oldest First</option>
+                    <option value="newest">🔽 Newest First</option>
+                    <option value="oldest">🔼 Oldest First</option>
                   </Form.Select>
                 </Col>
                 <Col md={3}>
@@ -340,37 +452,107 @@ const CallRecordsPage = () => {
                     onChange={(e) => {
                       setTimezone(e.target.value as Timezone)
                       setCurrentPage(1)
+                      setIsLastPage(false)
                     }}
+                    className="shadow-sm"
+                    style={{ fontSize: '0.95rem' }}
                   >
-                    <option value="UTC">UTC</option>
-                    <option value="EST">EST</option>
-                    <option value="CST">CST</option>
-                    <option value="MST">MST</option>
-                    <option value="PST">PST</option>
+                    <option value="UTC">🌍 UTC</option>
+                    <option value="EST">🇺🇸 EST</option>
+                    <option value="CST">🇺🇸 CST</option>
+                    <option value="MST">🇺🇸 MST</option>
+                    <option value="PST">🇺🇸 PST</option>
                   </Form.Select>
                 </Col>
               </Row>
 
               {/* Loading State */}
               {loading && (
-                <div className="text-center py-5">
-                  <Spinner animation="border" variant="primary" />
-                  <p className="mt-2">Loading call records...</p>
+                    <div
+                      className="text-center py-5"
+                      style={{
+                        background: 'linear-gradient(135deg, #f8f9ff 0%, #e8eaf6 100%)',
+                        borderRadius: '6px',
+                        padding: '3rem'
+                      }}
+                    >
+                  <div style={{ position: 'relative', display: 'inline-block' }}>
+                    <Spinner
+                      animation="border"
+                      style={{
+                        width: '3rem',
+                        height: '3rem',
+                        color: '#667eea',
+                        borderWidth: '3px'
+                      }}
+                    />
+                    <IconifyIcon
+                      icon="solar:phone-calling-rounded-bold"
+                      width={24}
+                      height={24}
+                      style={{
+                        position: 'absolute',
+                        top: '50%',
+                        left: '50%',
+                        transform: 'translate(-50%, -50%)',
+                        color: '#667eea'
+                      }}
+                    />
+                  </div>
+                  <p className="mt-3 mb-0" style={{ color: '#4b5563', fontWeight: '500', fontSize: '1.1rem' }}>
+                    Loading call records...
+                  </p>
+                  <p className="text-muted small mt-1">Please wait while we fetch your data</p>
                 </div>
               )}
 
               {/* Error State */}
               {error && !loading && (
-                <div className="alert alert-danger" role="alert">
-                  <IconifyIcon icon="solar:danger-outline" width={20} height={20} className="me-2" />
-                  {error}
-                  <Button
-                    variant="link"
-                    className="p-0 ms-2"
-                    onClick={fetchSummaries}
+                <div
+                  className="alert d-flex align-items-center"
+                  role="alert"
+                  style={{
+                    background: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+                    border: '2px solid #f87171',
+                    borderRadius: '6px',
+                    padding: '1.25rem'
+                  }}
+                >
+                  <div
+                    style={{
+                      width: '48px',
+                      height: '48px',
+                      borderRadius: '6px',
+                      background: '#dc2626',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      marginRight: '1rem'
+                    }}
                   >
-                    Try again
-                  </Button>
+                    <IconifyIcon icon="solar:danger-triangle-bold" width={24} height={24} style={{ color: 'white' }} />
+                  </div>
+                  <div className="flex-grow-1">
+                    <h6 className="mb-1" style={{ color: '#991b1b', fontWeight: '600' }}>Error Loading Records</h6>
+                    <p className="mb-0" style={{ color: '#7f1d1d' }}>{error}</p>
+                  </div>
+                  <button
+                    onClick={fetchSummaries}
+                    style={{
+                      border: 'none',
+                      background: '#dc2626',
+                      color: 'white',
+                      padding: '0.5rem 1rem',
+                      borderRadius: '6px',
+                      cursor: 'pointer',
+                      fontWeight: '600',
+                      transition: 'all 0.2s ease'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.background = '#b91c1c'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = '#dc2626'}
+                  >
+                    Try Again
+                  </button>
                 </div>
               )}
 
@@ -378,26 +560,88 @@ const CallRecordsPage = () => {
               {!loading && !error && (
                 <>
                   {sortedAndPaginatedSummaries.length === 0 && summaries.length === 0 ? (
-                    <div className="text-center py-5">
-                      <IconifyIcon icon="solar:call-chat-outline" width={64} height={64} className="text-muted mb-3" />
-                      <p className="text-muted">No call records found.</p>
-                      {debouncedSearch && (
-                        <p className="text-muted">
-                          Try adjusting your search or filter criteria.
-                        </p>
-                      )}
+                    <div
+                      className="text-center py-5"
+                      style={{
+                        background: 'linear-gradient(135deg, #f9fafb 0%, #e5e7eb 100%)',
+                        borderRadius: '6px',
+                        padding: '4rem 2rem'
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: '120px',
+                          height: '120px',
+                          borderRadius: '50%',
+                          background: '#4f46e5',
+                          display: 'inline-flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          marginBottom: '1.5rem',
+                          boxShadow: '0 8px 16px rgba(79,70,229,0.2)'
+                        }}
+                      >
+                        <IconifyIcon icon="solar:call-chat-bold" width={56} height={56} style={{ color: 'white' }} />
+                      </div>
+                      <h5 style={{ color: '#374151', fontWeight: '600', marginBottom: '0.5rem' }}>
+                        No Call Records Found
+                      </h5>
+                      <p className="text-muted mb-0" style={{ fontSize: '1rem' }}>
+                        {debouncedSearch
+                          ? 'Try adjusting your search or filter criteria to see results.'
+                          : 'There are no call records available at this time.'}
+                      </p>
                     </div>
                   ) : (
                     <>
-                      <div className="table-responsive">
-                        <Table hover striped className="align-middle mb-0">
-                          <thead className="table-light">
+                      <div
+                        className="table-responsive"
+                        style={{
+                          borderRadius: '6px',
+                          boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
+                          overflowX: 'auto',
+                          overflowY: 'hidden',
+                          maxWidth: '100%'
+                        }}
+                      >
+                        <Table hover className="align-middle mb-0" style={{ borderCollapse: 'separate', borderSpacing: 0, minWidth: '1800px' }}>
+                          <thead style={{
+                            backgroundColor: '#f8f9fa',
+                            color: '#495057',
+                            borderBottom: '2px solid #dee2e6',
+                            position: 'sticky',
+                            top: 0,
+                            zIndex: 100
+                          }}>
                             <tr>
-                              <th style={{ width: '60px' }} className="text-center">#</th>
                               <th
-                                style={{ width: '150px', cursor: 'pointer' }}
+                                style={{
+                                  width: '60px',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px'
+                                }}
+                                className="text-center"
+                              >
+                                #
+                              </th>
+                              <th
+                                style={{
+                                  width: '150px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Caller Name')}
                                 className="user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center gap-2">
                                   Caller Name
@@ -411,9 +655,20 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '200px', cursor: 'pointer' }}
+                                style={{
+                                  width: '200px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Caller Email')}
                                 className="user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center gap-2">
                                   Email
@@ -427,9 +682,20 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '130px', cursor: 'pointer' }}
+                                style={{
+                                  width: '130px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Caller Number')}
                                 className="user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center gap-2">
                                   Phone
@@ -443,12 +709,23 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '250px', cursor: 'pointer' }}
+                                style={{
+                                  width: '150px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Call timing')}
                                 className="user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center gap-2">
-                                  Call Time
+                                  Start Time
                                   {sortColumn === 'Call timing' && (
                                     <IconifyIcon
                                       icon={sortDirection === 'asc' ? 'solar:alt-arrow-up-outline' : 'solar:alt-arrow-down-outline'}
@@ -459,9 +736,47 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '120px', cursor: 'pointer' }}
+                                style={{
+                                  width: '150px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
+                                onClick={() => handleSort('End Call timing')}
+                                className="user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
+                              >
+                                <div className="d-flex align-items-center gap-2">
+                                  End Time
+                                  {sortColumn === 'End Call timing' && (
+                                    <IconifyIcon
+                                      icon={sortDirection === 'asc' ? 'solar:alt-arrow-up-outline' : 'solar:alt-arrow-down-outline'}
+                                      width={14}
+                                      height={14}
+                                    />
+                                  )}
+                                </div>
+                              </th>
+                              <th
+                                style={{
+                                  width: '120px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Duration')}
                                 className="text-center user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center justify-content-center gap-2">
                                   Duration
@@ -475,9 +790,20 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '250px', cursor: 'pointer' }}
+                                style={{
+                                  width: '250px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Brief Summary')}
                                 className="user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center gap-2">
                                   Summary
@@ -491,12 +817,23 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '120px', cursor: 'pointer' }}
+                                style={{
+                                  width: '120px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('View_Status')}
                                 className="text-center user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center justify-content-center gap-2">
-                                  Read Status
+                                  Status
                                   {sortColumn === 'View_Status' && (
                                     <IconifyIcon
                                       icon={sortDirection === 'asc' ? 'solar:alt-arrow-up-outline' : 'solar:alt-arrow-down-outline'}
@@ -507,9 +844,20 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '120px', cursor: 'pointer' }}
+                                style={{
+                                  width: '120px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Action_status')}
                                 className="text-center user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center justify-content-center gap-2">
                                   Action
@@ -523,9 +871,20 @@ const CallRecordsPage = () => {
                                 </div>
                               </th>
                               <th
-                                style={{ width: '100px', cursor: 'pointer' }}
+                                style={{
+                                  width: '100px',
+                                  cursor: 'pointer',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px',
+                                  transition: 'background-color 0.2s'
+                                }}
                                 onClick={() => handleSort('Urgency')}
                                 className="text-center user-select-none"
+                                onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#e9ecef'}
+                                onMouseLeave={(e) => e.currentTarget.style.backgroundColor = 'transparent'}
                               >
                                 <div className="d-flex align-items-center justify-content-center gap-2">
                                   Urgency
@@ -538,87 +897,120 @@ const CallRecordsPage = () => {
                                   )}
                                 </div>
                               </th>
-                              <th style={{ width: '150px' }} className="text-center">Actions</th>
+                              <th
+                                style={{
+                                  width: '150px',
+                                  borderBottom: 'none',
+                                  padding: '1rem 0.75rem',
+                                  fontWeight: '600',
+                                  fontSize: '0.85rem',
+                                  letterSpacing: '0.5px'
+                                }}
+                                className="text-center"
+                              >
+                                Actions
+                              </th>
                             </tr>
                           </thead>
                           <tbody>
                             {sortedAndPaginatedSummaries.map((summary, index) => (
-                              <tr key={summary.id || index}>
-                                <td className="text-center">
-                                  <span className="text-muted">{(currentPage - 1) * pageSize + index + 1}</span>
+                              <tr
+                                key={summary.id || index}
+                                style={{
+                                  borderBottom: '1px solid #dee2e6'
+                                }}
+                              >
+                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  <span className="text-muted">
+                                    {(currentPage - 1) * pageSize + index + 1}
+                                  </span>
                                 </td>
-                                <td>
-                                  <div className="fw-medium">{summary['Caller Name'] || 'N/A'}</div>
+                                <td style={{ padding: '1rem 0.75rem' }}>
+                                  <span className="fw-medium">
+                                    {summary['Caller Name'] || <span className="text-muted fst-italic">N/A</span>}
+                                  </span>
                                 </td>
-                                <td>
+                                <td style={{ padding: '1rem 0.75rem' }}>
                                   <div className="text-truncate" style={{ maxWidth: '200px' }} title={summary['Caller Email'] || ''}>
-                                    {summary['Caller Email'] || 'N/A'}
+                                    {summary['Caller Email'] || <span className="text-muted fst-italic">N/A</span>}
                                   </div>
                                 </td>
-                                <td>{summary['Caller Number'] || 'N/A'}</td>
-                                <td>
-                                  <div className="small">
+                                <td style={{ padding: '1rem 0.75rem' }}>
+                                  {summary['Caller Number'] || <span className="text-muted fst-italic">N/A</span>}
+                                </td>
+                                <td style={{ padding: '1rem 0.75rem', fontSize: '0.9rem' }}>
                                     {summary['Call timing'] || summary['Call Timing'] ? (
-                                      <>
-                                        <div className="text-muted mb-1">
-                                          <strong>Start:</strong> {summary['Call timing'] || summary['Call Timing']}
-                                        </div>
-                                        {summary['End Call timing'] && (
-                                          <div className="text-muted">
-                                            <strong>End:</strong> {summary['End Call timing']}
-                                          </div>
-                                        )}
-                                      </>
-                                    ) : (
-                                      <span className="text-muted">N/A</span>
-                                    )}
-                                  </div>
-                                </td>
-                                <td className="text-center">
-                                  {summary['Duration'] ? (
-                                    <Badge bg="info">
-                                      {summary['Duration']}
-                                    </Badge>
+                                    <span>
+                                      {(summary['Call timing'] || summary['Call Timing']).replace('Start (', '').replace(')', '')}
+                                    </span>
                                   ) : (
-                                    <span className="text-muted">N/A</span>
+                                    <span className="text-muted fst-italic">N/A</span>
                                   )}
                                 </td>
-                                <td>
-                                  <div className="text-truncate" style={{ maxWidth: '250px' }} title={summary['Brief Summary'] || ''}>
+                                <td style={{ padding: '1rem 0.75rem', fontSize: '0.9rem' }}>
+                                  {summary['End Call timing'] ? (
+                                    <span>
+                                      {summary['End Call timing'].replace('End (', '').replace(')', '')}
+                                    </span>
+                                  ) : (
+                                    <span className="text-muted fst-italic">N/A</span>
+                                  )}
+                                </td>
+                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
+                                  {summary['Duration'] ? (
+                                    <Badge bg="info" className="px-2 py-1">{summary['Duration']}</Badge>
+                                  ) : (
+                                    <span className="text-muted fst-italic">N/A</span>
+                                  )}
+                                </td>
+                                <td style={{ padding: '1rem 0.75rem' }}>
+                                  <div
+                                    className="text-truncate"
+                                    style={{
+                                      maxWidth: '250px',
+                                      fontSize: '0.9rem',
+                                      color: '#4b5563',
+                                      lineHeight: '1.5'
+                                    }}
+                                    title={summary['Brief Summary'] || ''}
+                                  >
                                     {summary['Brief Summary']
                                       ? (summary['Brief Summary'].length > 80
                                         ? summary['Brief Summary'].substring(0, 80) + '...'
                                         : summary['Brief Summary'])
-                                      : 'N/A'}
+                                      : <span className="text-muted fst-italic">No summary available</span>}
                                   </div>
                                 </td>
-                                <td className="text-center">
+                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['View_Status'] ? (
-                                    <Badge bg="success">Read</Badge>
+                                    <Badge bg="success" className="px-2 py-1">Read</Badge>
                                   ) : (
-                                    <Badge bg="warning">Unread</Badge>
+                                    <Badge bg="warning" text="dark" className="px-2 py-1">Unread</Badge>
                                   )}
                                 </td>
-                                <td className="text-center">
+                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['Action_flag'] ? (
-                                    <Badge bg={summary['Action_status'] === 'Done' ? 'success' : 'danger'}>
+                                    <Badge
+                                      bg={summary['Action_status'] === 'Done' ? 'success' : 'danger'}
+                                      className="px-2 py-1"
+                                    >
                                       {summary['Action_status'] || 'Pending'}
                                     </Badge>
                                   ) : (
-                                    <Badge bg="secondary">None</Badge>
+                                    <Badge bg="secondary" className="px-2 py-1">None</Badge>
                                   )}
                                 </td>
-                                <td className="text-center">
+                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   {summary['Urgency'] ? (
-                                    <Badge bg="danger">Urgent</Badge>
+                                    <Badge bg="danger" className="px-2 py-1">Urgent</Badge>
                                   ) : (
-                                    <Badge bg="secondary">Normal</Badge>
+                                    <Badge bg="secondary" className="px-2 py-1">Normal</Badge>
                                   )}
                                 </td>
-                                <td className="text-center">
+                                <td className="text-center" style={{ padding: '1rem 0.75rem' }}>
                                   <div className="d-flex gap-2 justify-content-center">
                                     <Button
-                                      variant="outline-primary"
+                                      variant="primary"
                                       size="sm"
                                       onClick={() => handleViewDetails(summary)}
                                       title="View Details"
@@ -627,7 +1019,7 @@ const CallRecordsPage = () => {
                                     </Button>
                                     {summary['Recording Link'] && (
                                       <Button
-                                        variant="outline-success"
+                                        variant="success"
                                         size="sm"
                                         as="a"
                                         href={summary['Recording Link']}
@@ -768,15 +1160,15 @@ const CallRecordsPage = () => {
                         </ModalFooter>
                       </Modal>
 
-                      {/* Custom Pagination */}
-                      <div className="d-flex justify-content-between align-items-center mt-3 pt-3 border-top">
-                        {/* Left side - Rows per page */}
+                      {/* Pagination */}
+                      <Row className="mt-4 pt-3 border-top">
+                        <Col sm={6} className="mb-3 mb-sm-0">
                         <div className="d-flex align-items-center gap-2">
                           <span className="text-muted">Rows per page:</span>
                           <Form.Select
                             value={pageSize}
                             onChange={(e) => handlePageSizeChange(Number(e.target.value))}
-                            style={{ width: 'auto', display: 'inline-block' }}
+                              style={{ width: 'auto', minWidth: '70px' }}
                             size="sm"
                           >
                             <option value={10}>10</option>
@@ -784,97 +1176,118 @@ const CallRecordsPage = () => {
                             <option value={50}>50</option>
                             <option value={100}>100</option>
                           </Form.Select>
+                            <span className="text-muted ms-2">
+                              Showing {startRecord}-{endRecord} of {typeof totalRecords === 'string' ? totalRecords : totalRecords}
+                            </span>
                         </div>
+                        </Col>
+                        <Col sm={6}>
+                          <ul className="pagination pagination-rounded justify-content-sm-end m-0">
+                            <li className={`page-item ${currentPage === 1 || loading ? 'disabled' : ''}`}>
+                              <a
+                                href="#"
+                                className="page-link"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  if (currentPage > 1 && !loading) handlePageChange(currentPage - 1)
+                                }}
+                              >
+                                <IconifyIcon icon="tdesign:arrow-left" />
+                              </a>
+                            </li>
+                            {(() => {
+                              const pages = []
+                              const maxPages = totalPages > 0 ? totalPages : 1
 
-                        {/* Right side - Page info and navigation */}
-                        <div className="d-flex align-items-center gap-3">
-                          {/* Record count */}
-                          <span className="text-muted">
-                            {startRecord}-{endRecord} of {typeof totalRecords === 'string' ? totalRecords : totalRecords}
-                          </span>
+                              // Always show first page
+                              pages.push(
+                                <li key={1} className={`page-item ${currentPage === 1 ? 'active' : ''}`}>
+                                  <a
+                                    href="#"
+                                    className="page-link"
+                                    onClick={(e) => {
+                                      e.preventDefault()
+                                      if (!loading) handlePageChange(1)
+                                    }}
+                                  >
+                                    1
+                                  </a>
+                                </li>
+                              )
 
-                          {/* Page button */}
-                          <Button
-                            variant="outline-secondary"
-                            size="sm"
-                            disabled
-                            className="px-3"
-                            style={{
-                              backgroundColor: 'var(--bs-gray-100)',
-                              borderColor: 'var(--bs-gray-300)',
-                              fontWeight: '500'
-                            }}
-                          >
-                            Page {currentPage} of {totalPages > 0 ? totalPages : 1}
-                          </Button>
-
-                          {/* Navigation buttons */}
-                          <div className="d-flex gap-1">
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              disabled={currentPage === 1 || loading}
-                              onClick={handleFirstPage}
-                              title="First page"
-                              className="d-flex align-items-center justify-content-center"
-                              style={{ minWidth: '38px', padding: '0.25rem 0.5rem' }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <line x1="3" y1="6" x2="3" y2="18"/>
-                                <line x1="5" y1="6" x2="5" y2="18"/>
-                                <polyline points="8 6 3 12 8 18"/>
-                              </svg>
-                            </Button>
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              disabled={currentPage === 1 || loading}
-                              onClick={() => handlePageChange(currentPage - 1)}
-                              title="Previous page"
-                              className="d-flex align-items-center justify-content-center"
-                              style={{ minWidth: '38px', padding: '0.25rem 0.5rem' }}
-                            >
-                              <IconifyIcon icon="solar:alt-arrow-left-outline" width={16} height={16} />
-                            </Button>
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              disabled={
-                                loading ||
-                                (sortColumn
-                                  ? (currentPage >= totalPages)
-                                  : !hasMore && sortedAndPaginatedSummaries.length < pageSize)
+                              // Show ellipsis if current page is far from start
+                              if (currentPage > 3) {
+                                pages.push(
+                                  <li key="ellipsis-start" className="page-item disabled">
+                                    <span className="page-link">...</span>
+                                  </li>
+                                )
                               }
-                              onClick={() => handlePageChange(currentPage + 1)}
-                              title="Next page"
-                              className="d-flex align-items-center justify-content-center"
-                              style={{ minWidth: '38px', padding: '0.25rem 0.5rem' }}
-                            >
-                              <IconifyIcon icon="solar:alt-arrow-right-outline" width={16} height={16} />
-                            </Button>
-                            <Button
-                              variant="outline-secondary"
-                              size="sm"
-                              disabled={
-                                loading ||
-                                (sortColumn
-                                  ? (currentPage >= totalPages)
-                                  : !hasMore && sortedAndPaginatedSummaries.length < pageSize)
+
+                              // Show pages around current page
+                              for (let i = Math.max(2, currentPage - 1); i <= Math.min(maxPages - 1, currentPage + 1); i++) {
+                                pages.push(
+                                  <li key={i} className={`page-item ${currentPage === i ? 'active' : ''}`}>
+                                    <a
+                                      href="#"
+                                      className="page-link"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        if (!loading) handlePageChange(i)
+                                      }}
+                                    >
+                                      {i}
+                                    </a>
+                                  </li>
+                                )
                               }
-                              onClick={handleLastPage}
-                              title="Last page"
-                              className="d-flex align-items-center justify-content-center"
-                              style={{ minWidth: '38px', padding: '0.25rem 0.5rem' }}
-                            >
-                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                <polyline points="16 6 21 12 16 18"/>
-                                <line x1="21" y1="6" x2="21" y2="18"/>
-                                <line x1="19" y1="6" x2="19" y2="18"/>
-                              </svg>
-                            </Button>
-                          </div>
-                        </div>
-                      </div>
+
+                              // Show ellipsis if current page is far from end
+                              if (currentPage < maxPages - 2) {
+                                pages.push(
+                                  <li key="ellipsis-end" className="page-item disabled">
+                                    <span className="page-link">...</span>
+                                  </li>
+                                )
+                              }
+
+                              // Always show last page if there's more than 1 page
+                              if (maxPages > 1) {
+                                pages.push(
+                                  <li key={maxPages} className={`page-item ${currentPage === maxPages ? 'active' : ''}`}>
+                                    <a
+                                      href="#"
+                                      className="page-link"
+                                      onClick={(e) => {
+                                        e.preventDefault()
+                                        if (!loading) handlePageChange(maxPages)
+                                      }}
+                                    >
+                                      {maxPages}
+                                    </a>
+                                  </li>
+                                )
+                              }
+
+                              return pages
+                            })()}
+                            <li className={`page-item ${isLastPage || loading || sortedAndPaginatedSummaries.length === 0 ? 'disabled' : ''}`}>
+                              <a
+                                href="#"
+                                className="page-link"
+                                onClick={(e) => {
+                                  e.preventDefault()
+                                  if (!isLastPage && !loading && sortedAndPaginatedSummaries.length > 0) {
+                                    handlePageChange(currentPage + 1)
+                                  }
+                                }}
+                              >
+                                <IconifyIcon icon="tdesign:arrow-right" />
+                              </a>
+                            </li>
+                          </ul>
+                        </Col>
+                      </Row>
                     </>
                   )}
                 </>
