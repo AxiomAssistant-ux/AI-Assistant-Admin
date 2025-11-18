@@ -6,13 +6,21 @@ export type UserOut = {
   role: 'admin' | 'user'
   agent_id: string | null
   created_at: string
+  blocked: boolean
 }
 
 export type TokenOut = {
   access_token: string
-  token_type: string
+  token_type?: string
   expires_in: number
   user: UserOut
+}
+
+export type AdminUserListResponse = {
+  items: UserOut[]
+  total: number
+  skip: number
+  limit: number
 }
 
 // Auth request types

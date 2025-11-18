@@ -35,7 +35,7 @@ function DataTable<T>({
   title,
   description,
   columns,
-  data,
+  data = [],
   loading = false,
   error = null,
   onRetry,
