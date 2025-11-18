@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import '@/assets/scss/style.scss'
+import 'react-toastify/dist/ReactToastify.css'
 import AppProvidersWrapper from '@/components/wrapper/AppProvidersWrapper'
 import { DEFAULT_PAGE_TITLE } from '@/context/constants'
 

@@ -14,6 +14,7 @@ import {
   Row
 } from 'react-bootstrap'
 import Link from 'next/link'
+import { toast } from 'react-toastify'
 import { DataTable } from '@/components/table'
 import type { DataTableColumn, DataTableFilterControl } from '@/components/table'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
@@ -22,7 +23,7 @@ import { adminUserApi } from '@/lib/admin-user-api'
 import type { UserOut } from '@/types/auth'
 import type { AdminUserCreatePayload, AdminUserUpdatePayload } from '@/types/admin-user'
 
-type ModalMode = 'create' | 'edit'
+type ModalMode = 'create' | 'edit' | 'assign-agent'
 
 const initialFormState: AdminUserCreatePayload = {
   username: '',
@@ -53,7 +54,10 @@ const UserManagementPage = () => {
   const [submitting, setSubmitting] = useState(false)
   const [blockLoadingId, setBlockLoadingId] = useState<string | null>(null)
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
+  const [agentLoadingId, setAgentLoadingId] = useState<string | null>(null)
   const [editingUserId, setEditingUserId] = useState<string | null>(null)
+  const [agentAssignmentUserId, setAgentAssignmentUserId] = useState<string | null>(null)
+  const [agentIdInput, setAgentIdInput] = useState('')
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400)
@@ -117,6 +121,8 @@ const UserManagementPage = () => {
     setFormData(initialFormState)
     setFormErrors({})
     setEditingUserId(null)
+    setAgentAssignmentUserId(null)
+    setAgentIdInput('')
   }
 
   const handleOpenModal = (mode: ModalMode, selected?: UserOut) => {
@@ -148,6 +154,12 @@ const UserManagementPage = () => {
   const handleFormSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
     if (!token) return
+
+    if (modalMode === 'assign-agent') {
+      await handleAssignAgent(event)
+      return
+    }
+
     if (!validateForm()) return
 
     setSubmitting(true)
@@ -163,9 +175,10 @@ const UserManagementPage = () => {
         }
         const response = await adminUserApi.createUser(token, payload)
         if (response.error) {
-          setError(response.error)
+          toast.error(response.error)
           return
         }
+        toast.success('User created successfully')
       } else if (editingUserId) {
         const payload: AdminUserUpdatePayload = {
           username: formData.username.trim(),
@@ -174,11 +187,12 @@ const UserManagementPage = () => {
         }
         const response = await adminUserApi.updateUser(token, editingUserId, payload)
         if (response.error) {
-          setError(response.error)
+          toast.error(response.error)
           return
         }
+        toast.success('User updated successfully')
       } else {
-        setError('No user selected for update')
+        toast.error('No user selected for update')
         return
       }
 
@@ -186,7 +200,7 @@ const UserManagementPage = () => {
       resetForm()
       fetchUsers()
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to save user')
+      toast.error(err instanceof Error ? err.message : 'Unable to save user')
     } finally {
       setSubmitting(false)
     }
@@ -213,14 +227,15 @@ const UserManagementPage = () => {
     try {
       const response = await adminUserApi.updateStatus(token, userRecord.id, !userRecord.blocked)
       if (response.error) {
-        setError(response.error)
+        toast.error(response.error)
       } else {
+        toast.success(userRecord.blocked ? 'User unblocked successfully' : 'User blocked successfully')
         setUsers((prev) =>
           prev.map((item) => (item.id === userRecord.id ? response.data ?? item : item))
         )
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to update status')
+      toast.error(err instanceof Error ? err.message : 'Unable to update status')
     } finally {
       setBlockLoadingId(null)
     }
@@ -237,14 +252,54 @@ const UserManagementPage = () => {
     try {
       const response = await adminUserApi.deleteUser(token, userRecord.id)
       if (response.error) {
-        setError(response.error)
+        toast.error(response.error)
       } else {
+        toast.success('User deleted successfully')
         fetchUsers()
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to delete user')
+      toast.error(err instanceof Error ? err.message : 'Unable to delete user')
     } finally {
       setDeleteLoadingId(null)
+    }
+  }
+
+  const handleOpenAgentModal = (userRecord: UserOut) => {
+    setAgentAssignmentUserId(userRecord.id)
+    setAgentIdInput(userRecord.agent_id || '')
+    setModalMode('assign-agent')
+    setShowModal(true)
+  }
+
+  const handleAssignAgent = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!token || !agentAssignmentUserId) return
+
+    setSubmitting(true)
+    setError(null)
+
+    try {
+      const payload: AdminUserUpdatePayload = {
+        agent_id: agentIdInput.trim() || null
+      }
+      const response = await adminUserApi.updateUser(token, agentAssignmentUserId, payload)
+      if (response.error) {
+        toast.error(response.error)
+      } else {
+        toast.success(
+          agentIdInput.trim()
+            ? `Agent assigned successfully`
+            : 'Agent unassigned successfully'
+        )
+        setShowModal(false)
+        setAgentAssignmentUserId(null)
+        setAgentIdInput('')
+        fetchUsers()
+      }
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Unable to assign agent')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -332,7 +387,7 @@ const UserManagementPage = () => {
         key: 'actions',
         header: 'Actions',
         align: 'center',
-        minWidth: 220,
+        minWidth: 280,
         sticky: 'right',
         render: (row) => (
           <div className="d-flex gap-2 justify-content-center flex-wrap">
@@ -367,6 +422,23 @@ const UserManagementPage = () => {
             </Button>
             <Button
               size="sm"
+              variant={row.agent_id ? 'outline-warning' : 'outline-info'}
+              onClick={() => handleOpenAgentModal(row)}
+              title={row.agent_id ? 'Unassign agent' : 'Assign agent'}
+              disabled={agentLoadingId === row.id}
+            >
+              {agentLoadingId === row.id ? (
+                <span className="spinner-border spinner-border-sm" role="status" />
+              ) : (
+                <IconifyIcon
+                  icon={row.agent_id ? 'solar:user-minus-outline' : 'solar:user-plus-outline'}
+                  width={16}
+                  height={16}
+                />
+              )}
+            </Button>
+            <Button
+              size="sm"
               variant="outline-danger"
               onClick={() => handleDeleteUser(row)}
               title="Delete user"
@@ -382,7 +454,7 @@ const UserManagementPage = () => {
         )
       }
     ],
-    [currentPage, pageSize, blockLoadingId, deleteLoadingId, users]
+    [currentPage, pageSize, blockLoadingId, deleteLoadingId, agentLoadingId, users]
   )
 
   const filters: DataTableFilterControl[] = [
@@ -513,51 +585,73 @@ const UserManagementPage = () => {
       <Modal show={showModal} onHide={() => setShowModal(false)} onExited={resetForm} centered>
         <Form onSubmit={handleFormSubmit}>
           <ModalHeader closeButton>
-            <ModalTitle>{modalMode === 'create' ? 'Add New User' : 'Edit User'}</ModalTitle>
+            <ModalTitle>
+              {modalMode === 'create'
+                ? 'Add New User'
+                : modalMode === 'assign-agent'
+                  ? 'Assign/Unassign Agent'
+                  : 'Edit User'}
+            </ModalTitle>
           </ModalHeader>
           <ModalBody>
-            <Form.Group className="mb-3">
-              <Form.Label>Username</Form.Label>
-              <Form.Control
-                value={formData.username}
-                onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
-                isInvalid={!!formErrors.username}
-                placeholder="Enter username"
-              />
-              <Form.Control.Feedback type="invalid">{formErrors.username}</Form.Control.Feedback>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>Email</Form.Label>
-              <Form.Control
-                type="email"
-                value={formData.email}
-                onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                isInvalid={!!formErrors.email}
-                placeholder="work@example.com"
-              />
-              <Form.Control.Feedback type="invalid">{formErrors.email}</Form.Control.Feedback>
-            </Form.Group>
-            {modalMode === 'create' && (
-              <Form.Group className="mb-3">
-                <Form.Label>Temporary Password</Form.Label>
+            {modalMode === 'assign-agent' ? (
+              <Form.Group className="mb-0">
+                <Form.Label>Agent ID</Form.Label>
                 <Form.Control
-                  type="password"
-                  value={formData.password}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
-                  isInvalid={!!formErrors.password}
-                  placeholder="Set an initial password"
+                  value={agentIdInput}
+                  onChange={(e) => setAgentIdInput(e.target.value)}
+                  placeholder="Enter agent ID (leave empty to unassign)"
                 />
-                <Form.Control.Feedback type="invalid">{formErrors.password}</Form.Control.Feedback>
+                <Form.Text className="text-muted">
+                  Enter an agent ID to assign, or leave empty to unassign the current agent.
+                </Form.Text>
               </Form.Group>
+            ) : (
+              <>
+                <Form.Group className="mb-3">
+                  <Form.Label>Username</Form.Label>
+                  <Form.Control
+                    value={formData.username}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, username: e.target.value }))}
+                    isInvalid={!!formErrors.username}
+                    placeholder="Enter username"
+                  />
+                  <Form.Control.Feedback type="invalid">{formErrors.username}</Form.Control.Feedback>
+                </Form.Group>
+                <Form.Group className="mb-3">
+                  <Form.Label>Email</Form.Label>
+                  <Form.Control
+                    type="email"
+                    value={formData.email}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
+                    isInvalid={!!formErrors.email}
+                    placeholder="work@example.com"
+                  />
+                  <Form.Control.Feedback type="invalid">{formErrors.email}</Form.Control.Feedback>
+                </Form.Group>
+                {modalMode === 'create' && (
+                  <Form.Group className="mb-3">
+                    <Form.Label>Temporary Password</Form.Label>
+                    <Form.Control
+                      type="password"
+                      value={formData.password}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, password: e.target.value }))}
+                      isInvalid={!!formErrors.password}
+                      placeholder="Set an initial password"
+                    />
+                    <Form.Control.Feedback type="invalid">{formErrors.password}</Form.Control.Feedback>
+                  </Form.Group>
+                )}
+                <Form.Group className="mb-0">
+                  <Form.Label>Agent ID (optional)</Form.Label>
+                  <Form.Control
+                    value={formData.agent_id ?? ''}
+                    onChange={(e) => setFormData((prev) => ({ ...prev, agent_id: e.target.value }))}
+                    placeholder="Assign agent id"
+                  />
+                </Form.Group>
+              </>
             )}
-            <Form.Group className="mb-0">
-              <Form.Label>Agent ID (optional)</Form.Label>
-              <Form.Control
-                value={formData.agent_id ?? ''}
-                onChange={(e) => setFormData((prev) => ({ ...prev, agent_id: e.target.value }))}
-                placeholder="Assign agent id"
-              />
-            </Form.Group>
           </ModalBody>
           <ModalFooter>
             <Button variant="light" onClick={() => setShowModal(false)}>
@@ -567,10 +661,10 @@ const UserManagementPage = () => {
               {submitting ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2" role="status" />
-                  Saving...
+                  {modalMode === 'assign-agent' ? 'Updating...' : 'Saving...'}
                 </>
               ) : (
-                'Save'
+                modalMode === 'assign-agent' ? 'Update Agent' : 'Save'
               )}
             </Button>
           </ModalFooter>
