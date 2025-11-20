@@ -39,12 +39,6 @@ const getStatusVariant = (status?: string) => {
   return 'secondary'
 }
 
-const usageModeOptions = [
-  { label: 'Auto (default)', value: 'auto' },
-  { label: 'Always On', value: 'always' },
-  { label: 'Contextual', value: 'contextual' }
-]
-
 const DEFAULT_PAGE_SIZE = 10
 
 const DocumentsPage = () => {
@@ -75,7 +69,6 @@ const DocumentsPage = () => {
   const [agentsLoading, setAgentsLoading] = useState(false)
 
   const [attachAgentId, setAttachAgentId] = useState('')
-  const [attachUsageMode, setAttachUsageMode] = useState('auto')
   const [attachSubmitting, setAttachSubmitting] = useState(false)
 
   const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
@@ -279,7 +272,6 @@ const DocumentsPage = () => {
     if (!ensureAdminAccess()) return
     setSelectedDocument(doc)
     setAttachAgentId('')
-    setAttachUsageMode('auto')
     setAttachModalOpen(true)
   }
 
@@ -301,7 +293,7 @@ const DocumentsPage = () => {
     try {
       const response = await knowledgeBaseApi.attachDocumentToAgent(token as string, attachAgentId, {
         document_id: docId,
-        usage_mode: attachUsageMode || 'auto'
+        usage_mode: 'auto'
       })
 
       if (response.error) {
@@ -665,16 +657,6 @@ const DocumentsPage = () => {
                     </option>
                   )
                 })}
-              </Form.Select>
-            </Form.Group>
-            <Form.Group controlId="attachUsageMode">
-              <Form.Label>Usage Mode</Form.Label>
-              <Form.Select value={attachUsageMode} onChange={(event) => setAttachUsageMode(event.target.value)}>
-                {usageModeOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
               </Form.Select>
             </Form.Group>
           </Modal.Body>
