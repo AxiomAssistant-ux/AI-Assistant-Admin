@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge, Col, Row } from 'react-bootstrap'
+import { Badge, Button, Col, Form, Modal, Row } from 'react-bootstrap'
 import Link from 'next/link'
 import { DataTable } from '@/components/table'
 import type { DataTableColumn, DataTableFilterControl } from '@/components/table'
@@ -9,6 +9,7 @@ import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { adminAgentApi } from '@/lib/admin-agent-api'
 import type { AdminAgent, AssignmentFilter } from '@/types/admin-agent'
+import { toast } from 'react-toastify'
 
 const matchesSearch = (agent: AdminAgent, term: string) => {
   const id = (agent.agent_id || agent.id || '').toLowerCase()
@@ -36,6 +37,45 @@ const matchesAssignment = (agent: AdminAgent, assignment: AssignmentFilter) => {
   return assignment === 'assigned' ? hasAssignedUsers : !hasAssignedUsers
 }
 
+const getAgentIdentifier = (agent?: AdminAgent | null) => agent?.agent_id || agent?.id || ''
+
+const buildEditFormState = (agent: AdminAgent): EditFormState => ({
+  name: agent.name || agent.conversation_config?.agent?.name || '',
+  description: agent.description || '',
+  default_language: agent.default_language || '',
+  additional_languages: (agent.additional_languages || []).join(', '),
+  voice_id: agent.tts?.voice_id || '',
+  model: agent.conversation_config?.agent?.prompt?.llm || '',
+  prompt: agent.conversation_config?.agent?.prompt?.prompt || ''
+})
+
+const sanitizeString = (value: string) => {
+  const trimmed = value.trim()
+  return trimmed ? trimmed : undefined
+}
+
+type AgentActionMode = 'view' | 'edit'
+
+type EditFormState = {
+  name: string
+  description: string
+  default_language: string
+  additional_languages: string
+  voice_id: string
+  model: string
+  prompt: string
+}
+
+const initialEditFormState: EditFormState = {
+  name: '',
+  description: '',
+  default_language: '',
+  additional_languages: '',
+  voice_id: '',
+  model: '',
+  prompt: ''
+}
+
 const AgentsPage = () => {
   const { token, isAuthenticated, user, isLoading } = useAuth()
   const [agents, setAgents] = useState<AdminAgent[]>([])
@@ -50,6 +90,17 @@ const AgentsPage = () => {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
   const [totalRecords, setTotalRecords] = useState(0)
+
+  const [selectedAgent, setSelectedAgent] = useState<AdminAgent | null>(null)
+  const [viewModalOpen, setViewModalOpen] = useState(false)
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false)
+  const [fetchingAgentId, setFetchingAgentId] = useState<string | null>(null)
+  const [editForm, setEditForm] = useState<EditFormState>(initialEditFormState)
+  const [editFormErrors, setEditFormErrors] = useState<Partial<Record<keyof EditFormState, string>>>({})
+  const [editSubmitting, setEditSubmitting] = useState(false)
+  const [deleteLoadingId, setDeleteLoadingId] = useState<string | null>(null)
+  const [activeActionMode, setActiveActionMode] = useState<AgentActionMode | null>(null)
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400)
@@ -138,6 +189,172 @@ const AgentsPage = () => {
     fetchAgents()
   }, [fetchAgents])
 
+  const handleAgentAction = useCallback(
+    async (agent: AdminAgent, mode: AgentActionMode) => {
+      if (!token || !isAuthenticated || user?.role !== 'admin') {
+        toast.error('You are not authorized to manage agents.')
+        return
+      }
+      const agentId = getAgentIdentifier(agent)
+      if (!agentId) {
+        toast.error('Agent identifier is missing.')
+        return
+      }
+
+      setFetchingAgentId(agentId)
+      setActiveActionMode(mode)
+      setEditFormErrors({})
+
+      try {
+        const response = await adminAgentApi.getAgent(token, agentId)
+        if (response.error || !response.data) {
+          toast.error(response.error || 'Failed to load agent details.')
+          return
+        }
+
+        setSelectedAgent(response.data)
+        if (mode === 'view') {
+          setViewModalOpen(true)
+        } else {
+          setEditForm(buildEditFormState(response.data))
+          setEditModalOpen(true)
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Unable to load agent.')
+      } finally {
+        setFetchingAgentId(null)
+        setActiveActionMode(null)
+      }
+    },
+    [token, isAuthenticated, user?.role]
+  )
+
+  const handleDeletePrompt = useCallback(
+    (agent: AdminAgent) => {
+      if (!isAuthenticated || user?.role !== 'admin') {
+        toast.error('You are not authorized to delete agents.')
+        return
+      }
+      setSelectedAgent(agent)
+      setDeleteModalOpen(true)
+    },
+    [isAuthenticated, user?.role]
+  )
+
+  const handleEditInputChange =
+    (field: keyof EditFormState) =>
+    (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+      const value = event.target.value
+      setEditForm((prev) => ({ ...prev, [field]: value }))
+      setEditFormErrors((prev) => ({ ...prev, [field]: '' }))
+    }
+
+  const validateEditForm = () => {
+    const errors: Partial<Record<keyof EditFormState, string>> = {}
+    if (!editForm.name.trim()) errors.name = 'Agent name is required'
+    if (!editForm.voice_id.trim()) errors.voice_id = 'Voice ID is required'
+    if (!editForm.prompt.trim()) errors.prompt = 'Prompt is required'
+    setEditFormErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
+  const handleEditSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault()
+    if (!selectedAgent) return
+    if (!token || !isAuthenticated || user?.role !== 'admin') {
+      toast.error('You are not authorized to update agents.')
+      return
+    }
+    if (!validateEditForm()) return
+
+    const agentId = getAgentIdentifier(selectedAgent)
+    if (!agentId) {
+      toast.error('Agent identifier is missing.')
+      return
+    }
+
+    const name = sanitizeString(editForm.name) ?? editForm.name.trim()
+    const description = sanitizeString(editForm.description ?? '')
+    const defaultLanguage = sanitizeString(editForm.default_language ?? '')
+    const additionalLanguages = editForm.additional_languages
+      .split(',')
+      .map((lang) => lang.trim())
+      .filter(Boolean)
+    const voiceId = sanitizeString(editForm.voice_id) ?? editForm.voice_id.trim()
+    const model = sanitizeString(editForm.model ?? '')
+    const prompt = sanitizeString(editForm.prompt) ?? editForm.prompt.trim()
+
+    const payload: Record<string, any> = {}
+    if (name) payload.name = name
+    if (description !== undefined) payload.description = description
+    if (defaultLanguage) payload.default_language = defaultLanguage
+    if (additionalLanguages.length) payload.additional_languages = additionalLanguages
+    if (voiceId) {
+      payload.tts = {
+        voice_id: voiceId
+      }
+    }
+
+    const agentConfig: Record<string, any> = {}
+    if (name) agentConfig.name = name
+    const promptConfig: Record<string, any> = {}
+    if (prompt) promptConfig.prompt = prompt
+    if (model) promptConfig.llm = model
+    if (Object.keys(promptConfig).length) agentConfig.prompt = promptConfig
+    if (Object.keys(agentConfig).length) {
+      payload.conversation_config = { agent: agentConfig }
+    }
+
+    setEditSubmitting(true)
+    try {
+      const response = await adminAgentApi.updateAgent(token, agentId, payload)
+      if (response.error || !response.data) {
+        toast.error(response.error || 'Failed to update agent.')
+        return
+      }
+      toast.success('Agent updated successfully.')
+      setSelectedAgent(response.data)
+      setEditModalOpen(false)
+      setEditForm(initialEditFormState)
+      fetchAgents()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to update agent.')
+    } finally {
+      setEditSubmitting(false)
+    }
+  }
+
+  const handleConfirmDelete = async () => {
+    if (!selectedAgent) return
+    if (!token || !isAuthenticated || user?.role !== 'admin') {
+      toast.error('You are not authorized to delete agents.')
+      return
+    }
+
+    const agentId = getAgentIdentifier(selectedAgent)
+    if (!agentId) {
+      toast.error('Agent identifier is missing.')
+      return
+    }
+
+    setDeleteLoadingId(agentId)
+    try {
+      const response = await adminAgentApi.deleteAgent(token, agentId)
+      if (response.error) {
+        toast.error(response.error || 'Failed to delete agent.')
+        return
+      }
+      toast.success('Agent deleted successfully.')
+      setDeleteModalOpen(false)
+      setSelectedAgent(null)
+      fetchAgents()
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Unable to delete agent.')
+    } finally {
+      setDeleteLoadingId(null)
+    }
+  }
+
   const formatDate = (value?: string) => {
     if (!value) return '—'
     try {
@@ -158,7 +375,7 @@ const AgentsPage = () => {
       {
         key: 'index',
         header: '#',
-        align: 'center',
+        align: 'left',
         width: 60,
         sticky: 'left',
         render: (_row, { rowIndex }) => (
@@ -178,39 +395,6 @@ const AgentsPage = () => {
         )
       },
       {
-        key: 'languages',
-        header: 'Languages',
-        minWidth: 180,
-        render: (row) => {
-          const languages = [
-            row.default_language,
-            ...(row.additional_languages ?? [])
-          ].filter(Boolean)
-          if (!languages.length) return <span className="text-muted">—</span>
-          return (
-            <div className="d-flex flex-wrap gap-1">
-              {languages.map((lang) => (
-                <Badge bg="secondary" key={`${row.agent_id}-${lang}`} className="text-uppercase">
-                  {lang}
-                </Badge>
-              ))}
-            </div>
-          )
-        }
-      },
-      {
-        key: 'voice',
-        header: 'Voice',
-        minWidth: 160,
-        render: (row) => row.tts?.voice_id || '—'
-      },
-      {
-        key: 'model',
-        header: 'Model',
-        minWidth: 160,
-        render: (row) => row.conversation_config?.agent?.prompt?.llm || '—'
-      },
-      {
         key: 'assigned',
         header: 'Assigned Users',
         minWidth: 220,
@@ -228,14 +412,79 @@ const AgentsPage = () => {
           )
       },
       {
-        key: 'updated_at',
-        header: 'Updated',
-        minWidth: 170,
+        key: 'actions',
+        header: 'Actions',
+        minWidth: 280,
+        align: 'center',
         sticky: 'right',
-        render: (row) => formatDate(row.updated_at || row.created_at)
+        defaultSticky: false,
+        enableStickyToggle: true,
+        render: (row) => {
+          const agentId = getAgentIdentifier(row)
+          if (!agentId) {
+            return <span className="text-muted">—</span>
+          }
+
+          const isViewLoading = fetchingAgentId === agentId && activeActionMode === 'view'
+          const isEditLoading = fetchingAgentId === agentId && activeActionMode === 'edit'
+          const isDeleteLoading = deleteLoadingId === agentId
+
+          return (
+            <div className="d-flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant="outline-secondary"
+                onClick={() => handleAgentAction(row, 'view')}
+                title="View agent"
+                disabled={isViewLoading}
+              >
+                {isViewLoading ? (
+                  <span className="spinner-border spinner-border-sm" role="status" />
+                ) : (
+                  <IconifyIcon icon="solar:eye-outline" width={16} height={16} />
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-primary"
+                onClick={() => handleAgentAction(row, 'edit')}
+                title="Edit agent"
+                disabled={isEditLoading}
+              >
+                {isEditLoading ? (
+                  <span className="spinner-border spinner-border-sm" role="status" />
+                ) : (
+                  <IconifyIcon icon="solar:pen-new-square-outline" width={16} height={16} />
+                )}
+              </Button>
+              <Button
+                size="sm"
+                variant="outline-danger"
+                onClick={() => handleDeletePrompt(row)}
+                title="Delete agent"
+                disabled={isDeleteLoading}
+              >
+                {isDeleteLoading ? (
+                  <span className="spinner-border spinner-border-sm" role="status" />
+                ) : (
+                  <IconifyIcon icon="solar:trash-bin-trash-outline" width={16} height={16} />
+                )}
+              </Button>
+            </div>
+          )
+        }
       }
     ],
-    [currentPage, pageSize]
+    [currentPage, pageSize, fetchingAgentId, activeActionMode, deleteLoadingId, handleAgentAction, handleDeletePrompt]
+  )
+
+  const tableMinWidth = useMemo(
+    () =>
+      columns.reduce((total, column) => {
+        const width = column.minWidth ?? column.width ?? 140
+        return total + width
+      }, 0),
+    [columns]
   )
 
   const toolbarFilters: DataTableFilterControl[] = useMemo(
@@ -336,6 +585,7 @@ const AgentsPage = () => {
             loading={loading}
             error={error}
             onRetry={fetchAgents}
+            minTableWidth={tableMinWidth}
             toolbar={{
               showFilters,
               onToggleFilters: () => setShowFilters((prev) => !prev),
@@ -352,11 +602,6 @@ const AgentsPage = () => {
               enableSticky: true,
               maxSticky: 4
             }}
-            tableContainerStyle={{
-              maxHeight: 'calc(100vh - 350px)',
-              overflowY: 'auto',
-              maxWidth: '100%'
-            }}
             pagination={{
               currentPage,
               pageSize,
@@ -365,11 +610,218 @@ const AgentsPage = () => {
               startRecord,
               endRecord,
               onPageChange: handlePageChange,
-              onPageSizeChange: handlePageSizeChange
+              onPageSizeChange: handlePageSizeChange,
+              pageSizeOptions: [10, 25, 50, 100],
+              isLastPage: currentPage >= totalPages,
+              hasMore: currentPage < totalPages
             }}
           />
         </Col>
       </Row>
+
+      <Modal show={viewModalOpen} onHide={() => setViewModalOpen(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Agent Details</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {selectedAgent ? (
+            <div className="d-flex flex-column gap-3">
+              <div>
+                <p className="text-muted text-uppercase small mb-1">Agent Name</p>
+                <h5 className="mb-0">{selectedAgent.name || 'Unnamed Agent'}</h5>
+              </div>
+              <Row className="g-3">
+                <Col md={6}>
+                  <p className="text-muted text-uppercase small mb-1">Agent ID</p>
+                  <div className="fw-semibold">{getAgentIdentifier(selectedAgent) || '—'}</div>
+                </Col>
+                <Col md={6}>
+                  <p className="text-muted text-uppercase small mb-1">Voice ID</p>
+                  <div>{selectedAgent.tts?.voice_id || '—'}</div>
+                </Col>
+                <Col md={6}>
+                  <p className="text-muted text-uppercase small mb-1">Primary Language</p>
+                  <div>{selectedAgent.default_language || '—'}</div>
+                </Col>
+                <Col md={6}>
+                  <p className="text-muted text-uppercase small mb-1">Model</p>
+                  <div>{selectedAgent.conversation_config?.agent?.prompt?.llm || '—'}</div>
+                </Col>
+                <Col md={12}>
+                  <p className="text-muted text-uppercase small mb-1">Additional Languages</p>
+                  {selectedAgent.additional_languages && selectedAgent.additional_languages.length > 0 ? (
+                    <div className="d-flex flex-wrap gap-2">
+                      {selectedAgent.additional_languages.map((lang) => (
+                        <Badge bg="secondary" key={`${getAgentIdentifier(selectedAgent)}-${lang}`} className="text-uppercase">
+                          {lang}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted">None</span>
+                  )}
+                </Col>
+                <Col md={12}>
+                  <p className="text-muted text-uppercase small mb-1">Assigned Users</p>
+                  {selectedAgent.assigned_users && selectedAgent.assigned_users.length > 0 ? (
+                    <div className="d-flex flex-wrap gap-2">
+                      {selectedAgent.assigned_users.map((username) => (
+                        <Badge bg="info" key={`${getAgentIdentifier(selectedAgent)}-${username}`}>
+                          {username}
+                        </Badge>
+                      ))}
+                    </div>
+                  ) : (
+                    <span className="text-muted">No users assigned</span>
+                  )}
+                </Col>
+                <Col md={12}>
+                  <p className="text-muted text-uppercase small mb-1">Prompt</p>
+                  <div className="bg-body-tertiary rounded p-3" style={{ whiteSpace: 'pre-wrap' }}>
+                    {selectedAgent.conversation_config?.agent?.prompt?.prompt || '—'}
+                  </div>
+                </Col>
+              </Row>
+            </div>
+          ) : (
+            <p className="text-muted mb-0">Select an agent to view their details.</p>
+          )}
+        </Modal.Body>
+      </Modal>
+
+      <Modal show={editModalOpen} onHide={() => setEditModalOpen(false)} size="lg" centered>
+        <Form onSubmit={handleEditSubmit}>
+          <Modal.Header closeButton>
+            <Modal.Title>Edit Agent</Modal.Title>
+          </Modal.Header>
+          <Modal.Body>
+            <Row className="g-3">
+              <Col md={6}>
+                <Form.Group controlId="editAgentName">
+                  <Form.Label>Agent Name</Form.Label>
+                  <Form.Control
+                    value={editForm.name}
+                    onChange={handleEditInputChange('name')}
+                    isInvalid={!!editFormErrors.name}
+                  />
+                  <Form.Control.Feedback type="invalid">{editFormErrors.name}</Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentLanguage">
+                  <Form.Label>Primary Language</Form.Label>
+                  <Form.Control value={editForm.default_language} onChange={handleEditInputChange('default_language')} />
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group controlId="editAgentDescription">
+                  <Form.Label>Description</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={2}
+                    value={editForm.description}
+                    onChange={handleEditInputChange('description')}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentAdditionalLanguages">
+                  <Form.Label>Additional Languages</Form.Label>
+                  <Form.Control
+                    value={editForm.additional_languages}
+                    onChange={handleEditInputChange('additional_languages')}
+                    placeholder="es, fr, de"
+                  />
+                  <Form.Text className="text-muted">Comma separated list.</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentVoice">
+                  <Form.Label>Voice ID</Form.Label>
+                  <Form.Control
+                    value={editForm.voice_id}
+                    onChange={handleEditInputChange('voice_id')}
+                    isInvalid={!!editFormErrors.voice_id}
+                  />
+                  <Form.Control.Feedback type="invalid">{editFormErrors.voice_id}</Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentModel">
+                  <Form.Label>LLM Model</Form.Label>
+                  <Form.Control value={editForm.model} onChange={handleEditInputChange('model')} placeholder="gpt-4o-mini" />
+                </Form.Group>
+              </Col>
+              <Col md={12}>
+                <Form.Group controlId="editAgentPrompt">
+                  <Form.Label>System Prompt</Form.Label>
+                  <Form.Control
+                    as="textarea"
+                    rows={4}
+                    value={editForm.prompt}
+                    onChange={handleEditInputChange('prompt')}
+                    isInvalid={!!editFormErrors.prompt}
+                  />
+                  <Form.Control.Feedback type="invalid">{editFormErrors.prompt}</Form.Control.Feedback>
+                </Form.Group>
+              </Col>
+            </Row>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={editSubmitting}>
+              {editSubmitting ? (
+                <>
+                  <span className="spinner-border spinner-border-sm me-2" role="status" />
+                  Saving...
+                </>
+              ) : (
+                <>
+                  <IconifyIcon icon="solar:floppy-disk-outline" width={16} height={16} className="me-2" />
+                  Save Changes
+                </>
+              )}
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      <Modal show={deleteModalOpen} onHide={() => setDeleteModalOpen(false)} centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Delete Agent</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <p className="mb-0">
+            Are you sure you want to delete{' '}
+            <strong>{selectedAgent?.name || getAgentIdentifier(selectedAgent) || 'this agent'}</strong>? This action cannot
+            be undone.
+          </p>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setDeleteModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirmDelete}
+            disabled={deleteLoadingId !== null && deleteLoadingId === getAgentIdentifier(selectedAgent)}
+          >
+            {deleteLoadingId !== null && deleteLoadingId === getAgentIdentifier(selectedAgent) ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                Deleting...
+              </>
+            ) : (
+              <>
+                <IconifyIcon icon="solar:trash-bin-trash-outline" width={16} height={16} className="me-2" />
+                Delete
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
     </>
   )
 }
