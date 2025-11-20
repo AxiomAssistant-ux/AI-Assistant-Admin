@@ -239,24 +239,6 @@ function DataTable<T>({
                     )}
                   </InputGroup>
                 )}
-                {pagination?.onPageSizeChange && (
-                  <InputGroup className="shadow-sm" style={{ width: 'auto', minWidth: '150px' }}>
-                    <InputGroup.Text className="bg-body-secondary">
-                      Limit
-                    </InputGroup.Text>
-                    <Form.Select
-                      value={pagination.pageSize}
-                      onChange={(event) => pagination.onPageSizeChange?.(Number(event.target.value))}
-                      style={{ fontSize: '0.95rem' }}
-                    >
-                      {(pagination.pageSizeOptions ?? DEFAULT_PAGE_SIZES).map((size) => (
-                        <option key={size} value={size}>
-                          {size} / page
-                        </option>
-                      ))}
-                    </Form.Select>
-                  </InputGroup>
-                )}
                 {columnPanel?.enableColumnVisibility && (
                   <div className="position-relative">
                     <Button
