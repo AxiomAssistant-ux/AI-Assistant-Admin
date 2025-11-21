@@ -8,7 +8,7 @@ import type { DataTableColumn, DataTableFilterControl } from '@/components/table
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { adminAgentApi } from '@/lib/admin-agent-api'
-import type { AdminAgent, AssignmentFilter } from '@/types/admin-agent'
+import type { AdminAgent, AssignmentFilter, CreateAgentPayload } from '@/types/admin-agent'
 import { toast } from 'react-toastify'
 
 const matchesSearch = (agent: AdminAgent, term: string) => {
@@ -40,40 +40,73 @@ const matchesAssignment = (agent: AdminAgent, assignment: AssignmentFilter) => {
 const getAgentIdentifier = (agent?: AdminAgent | null) => agent?.agent_id || agent?.id || ''
 
 const buildEditFormState = (agent: AdminAgent): EditFormState => ({
-  name: agent.name || agent.conversation_config?.agent?.name || '',
-  description: agent.description || '',
-  default_language: agent.default_language || '',
-  additional_languages: (agent.additional_languages || []).join(', '),
-  voice_id: agent.tts?.voice_id || '',
-  model: agent.conversation_config?.agent?.prompt?.llm || '',
-  prompt: agent.conversation_config?.agent?.prompt?.prompt || ''
-})
+  // Basic fields
+  name: agent.name || '',
+  tags: (agent.tags || []).join(', '),
 
-const sanitizeString = (value: string) => {
-  const trimmed = value.trim()
-  return trimmed ? trimmed : undefined
-}
+  // Agent config
+  prompt: agent.conversation_config?.agent?.prompt?.prompt || '',
+  llm: agent.conversation_config?.agent?.prompt?.llm || '',
+  language: agent.conversation_config?.agent?.language || '',
+  firstMessage: agent.conversation_config?.agent?.first_message || '',
+  temperature: agent.conversation_config?.agent?.prompt?.temperature?.toString() || '',
+  maxTokens: agent.conversation_config?.agent?.prompt?.max_tokens?.toString() || '',
+
+  // TTS config
+  voiceId: agent.conversation_config?.tts?.voice_id || '',
+  ttsModelId: agent.conversation_config?.tts?.model_id || '',
+  stability: agent.conversation_config?.tts?.stability?.toString() || '',
+  speed: agent.conversation_config?.tts?.speed?.toString() || '',
+  similarityBoost: agent.conversation_config?.tts?.similarity_boost?.toString() || '',
+
+  // Platform settings
+  recordCalls: agent.platform_settings?.record_calls || false,
+  debug: agent.platform_settings?.debug || false
+})
 
 type AgentActionMode = 'view' | 'edit'
 
 type EditFormState = {
+  // Basic fields
   name: string
-  description: string
-  default_language: string
-  additional_languages: string
-  voice_id: string
-  model: string
+  tags: string
+
+  // Agent config
   prompt: string
+  llm: string
+  language: string
+  firstMessage: string
+  temperature: string
+  maxTokens: string
+
+  // TTS config
+  voiceId: string
+  ttsModelId: string
+  stability: string
+  speed: string
+  similarityBoost: string
+
+  // Platform settings
+  recordCalls: boolean
+  debug: boolean
 }
 
 const initialEditFormState: EditFormState = {
   name: '',
-  description: '',
-  default_language: '',
-  additional_languages: '',
-  voice_id: '',
-  model: '',
-  prompt: ''
+  tags: '',
+  prompt: '',
+  llm: '',
+  language: '',
+  firstMessage: '',
+  temperature: '',
+  maxTokens: '',
+  voiceId: '',
+  ttsModelId: '',
+  stability: '',
+  speed: '',
+  similarityBoost: '',
+  recordCalls: false,
+  debug: false
 }
 
 const AgentsPage = () => {
@@ -244,16 +277,23 @@ const AgentsPage = () => {
   const handleEditInputChange =
     (field: keyof EditFormState) =>
     (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-      const value = event.target.value
+      const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+      const value = target.type === 'checkbox'
+        ? (target as HTMLInputElement).checked
+        : target.value
       setEditForm((prev) => ({ ...prev, [field]: value }))
       setEditFormErrors((prev) => ({ ...prev, [field]: '' }))
     }
 
   const validateEditForm = () => {
     const errors: Partial<Record<keyof EditFormState, string>> = {}
-    if (!editForm.name.trim()) errors.name = 'Agent name is required'
-    if (!editForm.voice_id.trim()) errors.voice_id = 'Voice ID is required'
-    if (!editForm.prompt.trim()) errors.prompt = 'Prompt is required'
+    // Note: For updates, fields are optional, but we validate if they're provided
+    if (editForm.voiceId.trim() && editForm.voiceId.trim().length === 0) {
+      errors.voiceId = 'Voice ID cannot be empty if provided'
+    }
+    if (editForm.prompt.trim() && editForm.prompt.trim().length === 0) {
+      errors.prompt = 'Prompt cannot be empty if provided'
+    }
     setEditFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -273,36 +313,76 @@ const AgentsPage = () => {
       return
     }
 
-    const name = sanitizeString(editForm.name) ?? editForm.name.trim()
-    const description = sanitizeString(editForm.description ?? '')
-    const defaultLanguage = sanitizeString(editForm.default_language ?? '')
-    const additionalLanguages = editForm.additional_languages
+    // Build tags array
+    const tags = editForm.tags
       .split(',')
-      .map((lang) => lang.trim())
+      .map((tag) => tag.trim())
       .filter(Boolean)
-    const voiceId = sanitizeString(editForm.voice_id) ?? editForm.voice_id.trim()
-    const model = sanitizeString(editForm.model ?? '')
-    const prompt = sanitizeString(editForm.prompt) ?? editForm.prompt.trim()
 
-    const payload: Record<string, any> = {}
-    if (name) payload.name = name
-    if (description !== undefined) payload.description = description
-    if (defaultLanguage) payload.default_language = defaultLanguage
-    if (additionalLanguages.length) payload.additional_languages = additionalLanguages
-    if (voiceId) {
-      payload.tts = {
-        voice_id: voiceId
-      }
+    // Build conversation_config (all fields optional for updates)
+    const conversationConfig: Partial<CreateAgentPayload['conversation_config']> = {}
+
+    // Agent section
+    const agentConfig: Record<string, any> = {}
+    if (editForm.language.trim()) agentConfig.language = editForm.language.trim()
+    if (editForm.firstMessage.trim()) agentConfig.first_message = editForm.firstMessage.trim()
+
+    // Prompt config
+    const promptConfig: Record<string, any> = {}
+    if (editForm.prompt.trim()) promptConfig.prompt = editForm.prompt.trim()
+    if (editForm.llm.trim()) promptConfig.llm = editForm.llm.trim()
+    if (editForm.temperature.trim()) {
+      const temp = parseFloat(editForm.temperature)
+      if (!isNaN(temp)) promptConfig.temperature = temp
+    }
+    if (editForm.maxTokens.trim()) {
+      const tokens = parseInt(editForm.maxTokens, 10)
+      if (!isNaN(tokens)) promptConfig.max_tokens = tokens
     }
 
-    const agentConfig: Record<string, any> = {}
-    if (name) agentConfig.name = name
-    const promptConfig: Record<string, any> = {}
-    if (prompt) promptConfig.prompt = prompt
-    if (model) promptConfig.llm = model
-    if (Object.keys(promptConfig).length) agentConfig.prompt = promptConfig
-    if (Object.keys(agentConfig).length) {
-      payload.conversation_config = { agent: agentConfig }
+    if (Object.keys(promptConfig).length > 0) {
+      agentConfig.prompt = promptConfig
+    }
+
+    if (Object.keys(agentConfig).length > 0) {
+      conversationConfig.agent = agentConfig
+    }
+
+    // TTS config
+    const ttsConfig: Record<string, any> = {}
+    if (editForm.voiceId.trim()) ttsConfig.voice_id = editForm.voiceId.trim()
+    if (editForm.ttsModelId.trim()) ttsConfig.model_id = editForm.ttsModelId.trim()
+    if (editForm.stability.trim()) {
+      const stability = parseFloat(editForm.stability)
+      if (!isNaN(stability)) ttsConfig.stability = stability
+    }
+    if (editForm.speed.trim()) {
+      const speed = parseFloat(editForm.speed)
+      if (!isNaN(speed)) ttsConfig.speed = speed
+    }
+    if (editForm.similarityBoost.trim()) {
+      const boost = parseFloat(editForm.similarityBoost)
+      if (!isNaN(boost)) ttsConfig.similarity_boost = boost
+    }
+
+    if (Object.keys(ttsConfig).length > 0) {
+      conversationConfig.tts = ttsConfig
+    }
+
+    // Build platform_settings
+    const platformSettings: Record<string, any> = {}
+    if (editForm.recordCalls) platformSettings.record_calls = true
+    if (editForm.debug) platformSettings.debug = true
+
+    // Build payload matching AgentUpdateRequest (all fields optional)
+    const payload: Partial<CreateAgentPayload> = {}
+    if (editForm.name.trim()) payload.name = editForm.name.trim()
+    if (tags.length > 0) payload.tags = tags
+    if (Object.keys(conversationConfig).length > 0) {
+      payload.conversation_config = conversationConfig as CreateAgentPayload['conversation_config']
+    }
+    if (Object.keys(platformSettings).length > 0) {
+      payload.platform_settings = platformSettings
     }
 
     setEditSubmitting(true)
@@ -694,8 +774,12 @@ const AgentsPage = () => {
           <Modal.Header closeButton>
             <Modal.Title>Edit Agent</Modal.Title>
           </Modal.Header>
-          <Modal.Body>
+          <Modal.Body style={{ maxHeight: '70vh', overflowY: 'auto' }}>
             <Row className="g-3">
+              {/* Basic Information */}
+              <Col xs={12}>
+                <h6 className="mb-3 text-primary">Basic Information</h6>
+              </Col>
               <Col md={6}>
                 <Form.Group controlId="editAgentName">
                   <Form.Label>Agent Name</Form.Label>
@@ -705,51 +789,45 @@ const AgentsPage = () => {
                     isInvalid={!!editFormErrors.name}
                   />
                   <Form.Control.Feedback type="invalid">{editFormErrors.name}</Form.Control.Feedback>
+                  <Form.Text className="text-muted">Optional: Name for the agent</Form.Text>
                 </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentTags">
+                  <Form.Label>Tags</Form.Label>
+                  <Form.Control
+                    value={editForm.tags}
+                    onChange={handleEditInputChange('tags')}
+                    placeholder="sales, support, english"
+                  />
+                  <Form.Text className="text-muted">Comma separated tags (optional)</Form.Text>
+                </Form.Group>
+              </Col>
+
+              {/* Agent Configuration */}
+              <Col xs={12} className="mt-4">
+                <h6 className="mb-3 text-primary">Agent Configuration</h6>
               </Col>
               <Col md={6}>
                 <Form.Group controlId="editAgentLanguage">
-                  <Form.Label>Primary Language</Form.Label>
-                  <Form.Control value={editForm.default_language} onChange={handleEditInputChange('default_language')} />
-                </Form.Group>
-              </Col>
-              <Col md={12}>
-                <Form.Group controlId="editAgentDescription">
-                  <Form.Label>Description</Form.Label>
+                  <Form.Label>Language</Form.Label>
                   <Form.Control
-                    as="textarea"
-                    rows={2}
-                    value={editForm.description}
-                    onChange={handleEditInputChange('description')}
+                    value={editForm.language}
+                    onChange={handleEditInputChange('language')}
+                    placeholder="en"
                   />
+                  <Form.Text className="text-muted">Primary language code (e.g., en, es, fr)</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
-                <Form.Group controlId="editAgentAdditionalLanguages">
-                  <Form.Label>Additional Languages</Form.Label>
+                <Form.Group controlId="editAgentFirstMessage">
+                  <Form.Label>First Message</Form.Label>
                   <Form.Control
-                    value={editForm.additional_languages}
-                    onChange={handleEditInputChange('additional_languages')}
-                    placeholder="es, fr, de"
+                    value={editForm.firstMessage}
+                    onChange={handleEditInputChange('firstMessage')}
+                    placeholder="Hello! How can I help you today?"
                   />
-                  <Form.Text className="text-muted">Comma separated list.</Form.Text>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group controlId="editAgentVoice">
-                  <Form.Label>Voice ID</Form.Label>
-                  <Form.Control
-                    value={editForm.voice_id}
-                    onChange={handleEditInputChange('voice_id')}
-                    isInvalid={!!editFormErrors.voice_id}
-                  />
-                  <Form.Control.Feedback type="invalid">{editFormErrors.voice_id}</Form.Control.Feedback>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group controlId="editAgentModel">
-                  <Form.Label>LLM Model</Form.Label>
-                  <Form.Control value={editForm.model} onChange={handleEditInputChange('model')} placeholder="gpt-4o-mini" />
+                  <Form.Text className="text-muted">Optional: Initial greeting message</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={12}>
@@ -760,9 +838,156 @@ const AgentsPage = () => {
                     rows={4}
                     value={editForm.prompt}
                     onChange={handleEditInputChange('prompt')}
+                    placeholder="Describe how the agent should behave..."
                     isInvalid={!!editFormErrors.prompt}
                   />
                   <Form.Control.Feedback type="invalid">{editFormErrors.prompt}</Form.Control.Feedback>
+                  <Form.Text className="text-muted">Define the agent's behavior and personality</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="editAgentLLM">
+                  <Form.Label>LLM Model</Form.Label>
+                  <Form.Control
+                    value={editForm.llm}
+                    onChange={handleEditInputChange('llm')}
+                    placeholder="gpt-4o-mini"
+                  />
+                  <Form.Text className="text-muted">Optional: LLM model identifier</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="editAgentTemperature">
+                  <Form.Label>Temperature</Form.Label>
+                  <Form.Control
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="2"
+                    value={editForm.temperature}
+                    onChange={handleEditInputChange('temperature')}
+                    placeholder="0.7"
+                  />
+                  <Form.Text className="text-muted">Optional: 0-2, controls randomness</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="editAgentMaxTokens">
+                  <Form.Label>Max Tokens</Form.Label>
+                  <Form.Control
+                    type="number"
+                    value={editForm.maxTokens}
+                    onChange={handleEditInputChange('maxTokens')}
+                    placeholder="1000"
+                  />
+                  <Form.Text className="text-muted">Optional: Maximum response length</Form.Text>
+                </Form.Group>
+              </Col>
+
+              {/* TTS Configuration */}
+              <Col xs={12} className="mt-4">
+                <h6 className="mb-3 text-primary">Text-to-Speech Configuration</h6>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentVoice">
+                  <Form.Label>Voice ID</Form.Label>
+                  <Form.Control
+                    value={editForm.voiceId}
+                    onChange={handleEditInputChange('voiceId')}
+                    placeholder="voice_123"
+                    isInvalid={!!editFormErrors.voiceId}
+                  />
+                  <Form.Control.Feedback type="invalid">{editFormErrors.voiceId}</Form.Control.Feedback>
+                  <Form.Text className="text-muted">ElevenLabs voice identifier</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group controlId="editAgentTTSModel">
+                  <Form.Label>TTS Model</Form.Label>
+                  <Form.Select
+                    value={editForm.ttsModelId}
+                    onChange={handleEditInputChange('ttsModelId')}
+                  >
+                    <option value="">Select TTS Model (Optional)</option>
+                    <option value="eleven_turbo_v2">Eleven Turbo v2</option>
+                    <option value="eleven_flash_v2">Eleven Flash v2</option>
+                    <option value="eleven_multilingual_v2">Eleven Multilingual v2</option>
+                  </Form.Select>
+                  <Form.Text className="text-muted">Optional: TTS model selection</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="editAgentStability">
+                  <Form.Label>Stability</Form.Label>
+                  <Form.Control
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="1"
+                    value={editForm.stability}
+                    onChange={handleEditInputChange('stability')}
+                    placeholder="0.5"
+                  />
+                  <Form.Text className="text-muted">Optional: 0-1, voice stability</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="editAgentSpeed">
+                  <Form.Label>Speed</Form.Label>
+                  <Form.Control
+                    type="number"
+                    step="0.1"
+                    min="0.25"
+                    max="4"
+                    value={editForm.speed}
+                    onChange={handleEditInputChange('speed')}
+                    placeholder="1.0"
+                  />
+                  <Form.Text className="text-muted">Optional: 0.25-4, speech speed</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group controlId="editAgentSimilarityBoost">
+                  <Form.Label>Similarity Boost</Form.Label>
+                  <Form.Control
+                    type="number"
+                    step="0.1"
+                    min="0"
+                    max="1"
+                    value={editForm.similarityBoost}
+                    onChange={handleEditInputChange('similarityBoost')}
+                    placeholder="0.75"
+                  />
+                  <Form.Text className="text-muted">Optional: 0-1, voice similarity</Form.Text>
+                </Form.Group>
+              </Col>
+
+              {/* Platform Settings */}
+              <Col xs={12} className="mt-4">
+                <h6 className="mb-3 text-primary">Platform Settings</h6>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Check
+                    type="checkbox"
+                    id="editRecordCalls"
+                    label="Record Calls"
+                    checked={editForm.recordCalls}
+                    onChange={handleEditInputChange('recordCalls')}
+                  />
+                  <Form.Text className="text-muted">Enable call recording for this agent</Form.Text>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group>
+                  <Form.Check
+                    type="checkbox"
+                    id="editDebug"
+                    label="Debug Mode"
+                    checked={editForm.debug}
+                    onChange={handleEditInputChange('debug')}
+                  />
+                  <Form.Text className="text-muted">Enable debug logging for this agent</Form.Text>
                 </Form.Group>
               </Col>
             </Row>
