@@ -9,7 +9,7 @@ import TextFormInput from '@/components/from/TextFormInput'
 import PasswordFormInput from '@/components/from/PasswordFormInput'
 import { useAuth } from '@/context/useAuthContext'
 import { yupResolver } from '@hookform/resolvers/yup'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import * as yup from 'yup'
 import { Card, CardBody, Col, Row, Alert } from 'react-bootstrap'
 import type { SignUpRequest } from '@/types/auth'
@@ -33,22 +33,24 @@ const SignUp = () => {
     }
   }, [isAuthenticated, router])
 
-  const messageSchema = yup.object({
-    username: yup
-      .string()
-      .min(3, 'Username must be at least 3 characters')
-      .max(64, 'Username must be less than 64 characters')
-      .required('Username is required'),
-    email: yup
-      .string()
-      .email('Please enter a valid email')
-      .required('Email is required'),
-    password: yup
-      .string()
-      .min(8, 'Password must be at least 8 characters')
-      .max(128, 'Password must be less than 128 characters')
-      .required('Password is required'),
-  })
+  const messageSchema: yup.ObjectSchema<SignUpRequest> = yup
+    .object({
+      username: yup
+        .string()
+        .min(3, 'Username must be at least 3 characters')
+        .max(64, 'Username must be less than 64 characters')
+        .required('Username is required'),
+      email: yup
+        .string()
+        .email('Please enter a valid email')
+        .required('Email is required'),
+      password: yup
+        .string()
+        .min(8, 'Password must be at least 8 characters')
+        .max(128, 'Password must be less than 128 characters')
+        .required('Password is required'),
+    })
+    .required()
 
   const { handleSubmit, control } = useForm<SignUpRequest>({
     defaultValues: {
@@ -56,7 +58,7 @@ const SignUp = () => {
       email: '',
       password: '',
     },
-    resolver: yupResolver(messageSchema),
+    resolver: yupResolver(messageSchema) as Resolver<SignUpRequest>,
   })
 
   const handleSignUp = async (data: SignUpRequest) => {

@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Card, CardBody, Col, Row, Alert } from 'react-bootstrap'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import * as yup from 'yup'
 import type { SignInRequest } from '@/types/auth'
 
@@ -20,10 +20,12 @@ const SignIn = () => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const messageSchema = yup.object({
-    email: yup.string().email('Please enter a valid email').required('Email is required'),
-    password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
-  })
+  const messageSchema: yup.ObjectSchema<SignInRequest> = yup
+    .object({
+      email: yup.string().email('Please enter a valid email').required('Email is required'),
+      password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
+    })
+    .required()
 
   useEffect(() => {
     document.body.classList.add('authentication-bg')
@@ -43,7 +45,7 @@ const SignIn = () => {
       email: '',
       password: '',
     },
-    resolver: yupResolver(messageSchema),
+    resolver: yupResolver(messageSchema) as Resolver<SignInRequest>,
   })
 
   const handleLogin = async (data: SignInRequest) => {

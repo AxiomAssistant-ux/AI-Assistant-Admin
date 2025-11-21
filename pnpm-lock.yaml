@@ -17,6 +17,9 @@ importers:
       '@fullcalendar/daygrid':
         specifier: ^6.1.15
         version: 6.1.19(@fullcalendar/core@6.1.19)
+      '@fullcalendar/interaction':
+        specifier: ^6.1.19
+        version: 6.1.19(@fullcalendar/core@6.1.19)
       '@fullcalendar/list':
         specifier: ^6.1.15
         version: 6.1.19(@fullcalendar/core@6.1.19)
