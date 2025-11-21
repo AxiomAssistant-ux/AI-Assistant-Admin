@@ -8,25 +8,49 @@ import { toast } from 'react-toastify'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { adminAgentApi } from '@/lib/admin-agent-api'
+import type { CreateAgentPayload, TTSModelLiteral } from '@/types/admin-agent'
 
 type AgentFormState = {
+  // Basic fields
   name: string
-  description: string
-  language: string
-  additionalLanguages: string
-  voiceId: string
-  model: string
+  tags: string
+
+  // Agent config
   prompt: string
+  llm: string
+  language: string
+  firstMessage: string
+  temperature: string
+  maxTokens: string
+
+  // TTS config
+  voiceId: string
+  ttsModelId: string
+  stability: string
+  speed: string
+  similarityBoost: string
+
+  // Platform settings
+  recordCalls: boolean
+  debug: boolean
 }
 
 const initialFormState: AgentFormState = {
   name: '',
-  description: '',
+  tags: '',
+  prompt: '',
+  llm: '',
   language: 'en',
-  additionalLanguages: '',
+  firstMessage: '',
+  temperature: '',
+  maxTokens: '',
   voiceId: '',
-  model: '',
-  prompt: ''
+  ttsModelId: '',
+  stability: '',
+  speed: '',
+  similarityBoost: '',
+  recordCalls: false,
+  debug: false
 }
 
 const CreateAgentPage = () => {
@@ -36,19 +60,28 @@ const CreateAgentPage = () => {
   const [formErrors, setFormErrors] = useState<Record<string, string>>({})
   const [submitting, setSubmitting] = useState(false)
 
-  const handleInputChange = (field: keyof AgentFormState) => (event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+  const handleInputChange = (field: keyof AgentFormState) => (
+    event: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>
+  ) => {
+    const target = event.target as HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement
+    const value = target.type === 'checkbox'
+      ? (target as HTMLInputElement).checked
+      : target.value
     setFormData((prev) => ({
       ...prev,
-      [field]: event.target.value
+      [field]: value
     }))
     setFormErrors((prev) => ({ ...prev, [field]: '' }))
   }
 
   const validateForm = () => {
     const errors: Record<string, string> = {}
-    if (!formData.name.trim()) errors.name = 'Agent name is required'
-    if (!formData.prompt.trim()) errors.prompt = 'Prompt is required'
-    if (!formData.voiceId.trim()) errors.voiceId = 'Voice ID is required'
+    if (!formData.prompt.trim()) {
+      errors.prompt = 'System prompt is required'
+    }
+    if (!formData.voiceId.trim()) {
+      errors.voiceId = 'Voice ID is required'
+    }
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
@@ -63,28 +96,53 @@ const CreateAgentPage = () => {
 
     setSubmitting(true)
     try {
-      const additionalLanguages = formData.additionalLanguages
+      // Build tags array
+      const tags = formData.tags
         .split(',')
-        .map((lang) => lang.trim())
+        .map((tag) => tag.trim())
         .filter(Boolean)
 
-      const payload = {
-        name: formData.name.trim(),
-        description: formData.description.trim() || undefined,
-        default_language: formData.language.trim() || undefined,
-        additional_languages: additionalLanguages.length ? additionalLanguages : undefined,
-        tts: {
-          voice_id: formData.voiceId.trim()
-        },
-        conversation_config: {
-          agent: {
-            name: formData.name.trim(),
-            prompt: {
-              prompt: formData.prompt.trim(),
-              llm: formData.model.trim() || undefined
-            }
+      // Build conversation_config
+      const ttsModelId = formData.ttsModelId.trim()
+      const validTTSModelIds: TTSModelLiteral[] = ['eleven_turbo_v2', 'eleven_flash_v2', 'eleven_multilingual_v2']
+      const modelId: TTSModelLiteral | undefined = validTTSModelIds.includes(ttsModelId as TTSModelLiteral)
+        ? (ttsModelId as TTSModelLiteral)
+        : undefined
+
+      const conversationConfig: CreateAgentPayload['conversation_config'] = {
+        agent: {
+          language: formData.language.trim() || undefined,
+          first_message: formData.firstMessage.trim() || undefined,
+          prompt: {
+            prompt: formData.prompt.trim(),
+            llm: formData.llm.trim() || undefined,
+            temperature: formData.temperature ? parseFloat(formData.temperature) : undefined,
+            max_tokens: formData.maxTokens ? parseInt(formData.maxTokens, 10) : undefined
           }
+        },
+        tts: {
+          voice_id: formData.voiceId.trim(),
+          model_id: modelId,
+          stability: formData.stability ? parseFloat(formData.stability) : undefined,
+          speed: formData.speed ? parseFloat(formData.speed) : undefined,
+          similarity_boost: formData.similarityBoost ? parseFloat(formData.similarityBoost) : undefined
         }
+      }
+
+      // Build platform_settings
+      const platformSettings = formData.recordCalls || formData.debug
+        ? {
+            record_calls: formData.recordCalls || undefined,
+            debug: formData.debug || undefined
+          }
+        : undefined
+
+      // Build payload matching AgentCreateRequest
+      const payload: CreateAgentPayload = {
+        conversation_config: conversationConfig,
+        name: formData.name.trim() || undefined,
+        tags: tags.length > 0 ? tags : undefined,
+        platform_settings: platformSettings
       }
 
       const response = await adminAgentApi.createAgent(token, payload)
@@ -162,6 +220,10 @@ const CreateAgentPage = () => {
             <CardBody>
               <Form onSubmit={handleCreateAgent}>
                 <Row className="g-3">
+                  {/* Basic Information */}
+                  <Col xs={12}>
+                    <h6 className="mb-3 text-primary">Basic Information</h6>
+                  </Col>
                   <Col md={6}>
                     <Form.Group>
                       <Form.Label>Agent Name</Form.Label>
@@ -169,69 +231,51 @@ const CreateAgentPage = () => {
                         value={formData.name}
                         onChange={handleInputChange('name')}
                         placeholder="Sales Concierge"
-                        isInvalid={!!formErrors.name}
                       />
-                      <Form.Control.Feedback type="invalid">{formErrors.name}</Form.Control.Feedback>
+                      <Form.Text className="text-muted">Optional: Name for the agent</Form.Text>
                     </Form.Group>
                   </Col>
                   <Col md={6}>
                     <Form.Group>
-                      <Form.Label>Primary Language</Form.Label>
+                      <Form.Label>Tags</Form.Label>
+                      <Form.Control
+                        value={formData.tags}
+                        onChange={handleInputChange('tags')}
+                        placeholder="sales, support, english"
+                      />
+                      <Form.Text className="text-muted">Comma separated tags (optional)</Form.Text>
+                    </Form.Group>
+                  </Col>
+
+                  {/* Agent Configuration */}
+                  <Col xs={12} className="mt-4">
+                    <h6 className="mb-3 text-primary">Agent Configuration</h6>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Language</Form.Label>
                       <Form.Control
                         value={formData.language}
                         onChange={handleInputChange('language')}
                         placeholder="en"
                       />
+                      <Form.Text className="text-muted">Primary language code (e.g., en, es, fr)</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>First Message</Form.Label>
+                      <Form.Control
+                        value={formData.firstMessage}
+                        onChange={handleInputChange('firstMessage')}
+                        placeholder="Hello! How can I help you today?"
+                      />
+                      <Form.Text className="text-muted">Optional: Initial greeting message</Form.Text>
                     </Form.Group>
                   </Col>
                   <Col md={12}>
                     <Form.Group>
-                      <Form.Label>Description</Form.Label>
-                      <Form.Control
-                        as="textarea"
-                        rows={2}
-                        value={formData.description}
-                        onChange={handleInputChange('description')}
-                        placeholder="Short description of the agent's responsibilities."
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Additional Languages</Form.Label>
-                      <Form.Control
-                        value={formData.additionalLanguages}
-                        onChange={handleInputChange('additionalLanguages')}
-                        placeholder="es, fr, de"
-                      />
-                      <Form.Text className="text-muted">Comma separated list (optional).</Form.Text>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>Voice ID</Form.Label>
-                      <Form.Control
-                        value={formData.voiceId}
-                        onChange={handleInputChange('voiceId')}
-                        placeholder="voice_123"
-                        isInvalid={!!formErrors.voiceId}
-                      />
-                      <Form.Control.Feedback type="invalid">{formErrors.voiceId}</Form.Control.Feedback>
-                    </Form.Group>
-                  </Col>
-                  <Col md={6}>
-                    <Form.Group>
-                      <Form.Label>LLM Model</Form.Label>
-                      <Form.Control
-                        value={formData.model}
-                        onChange={handleInputChange('model')}
-                        placeholder="gpt-4o-mini"
-                      />
-                    </Form.Group>
-                  </Col>
-                  <Col md={12}>
-                    <Form.Group>
-                      <Form.Label>System Prompt</Form.Label>
+                      <Form.Label>System Prompt <span className="text-danger">*</span></Form.Label>
                       <Form.Control
                         as="textarea"
                         rows={4}
@@ -241,10 +285,157 @@ const CreateAgentPage = () => {
                         isInvalid={!!formErrors.prompt}
                       />
                       <Form.Control.Feedback type="invalid">{formErrors.prompt}</Form.Control.Feedback>
+                      <Form.Text className="text-muted">Required: Define the agent's behavior and personality</Form.Text>
                     </Form.Group>
                   </Col>
-                  <Col xs={12} className="text-end">
-                    <Button type="submit" disabled={submitting}>
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>LLM Model</Form.Label>
+                      <Form.Control
+                        value={formData.llm}
+                        onChange={handleInputChange('llm')}
+                        placeholder="gpt-4o-mini"
+                      />
+                      <Form.Text className="text-muted">Optional: LLM model identifier</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Temperature</Form.Label>
+                      <Form.Control
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="2"
+                        value={formData.temperature}
+                        onChange={handleInputChange('temperature')}
+                        placeholder="0.7"
+                      />
+                      <Form.Text className="text-muted">Optional: 0-2, controls randomness</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Max Tokens</Form.Label>
+                      <Form.Control
+                        type="number"
+                        value={formData.maxTokens}
+                        onChange={handleInputChange('maxTokens')}
+                        placeholder="1000"
+                      />
+                      <Form.Text className="text-muted">Optional: Maximum response length</Form.Text>
+                    </Form.Group>
+                  </Col>
+
+                  {/* TTS Configuration */}
+                  <Col xs={12} className="mt-4">
+                    <h6 className="mb-3 text-primary">Text-to-Speech Configuration</h6>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>Voice ID <span className="text-danger">*</span></Form.Label>
+                      <Form.Control
+                        value={formData.voiceId}
+                        onChange={handleInputChange('voiceId')}
+                        placeholder="voice_123"
+                        isInvalid={!!formErrors.voiceId}
+                      />
+                      <Form.Control.Feedback type="invalid">{formErrors.voiceId}</Form.Control.Feedback>
+                      <Form.Text className="text-muted">Required: ElevenLabs voice identifier</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Label>TTS Model</Form.Label>
+                      <Form.Select
+                        value={formData.ttsModelId}
+                        onChange={handleInputChange('ttsModelId')}
+                      >
+                        <option value="">Select TTS Model (Optional)</option>
+                        <option value="eleven_turbo_v2">Eleven Turbo v2</option>
+                        <option value="eleven_flash_v2">Eleven Flash v2</option>
+                        <option value="eleven_multilingual_v2">Eleven Multilingual v2</option>
+                      </Form.Select>
+                      <Form.Text className="text-muted">Optional: TTS model selection</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Stability</Form.Label>
+                      <Form.Control
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="1"
+                        value={formData.stability}
+                        onChange={handleInputChange('stability')}
+                        placeholder="0.5"
+                      />
+                      <Form.Text className="text-muted">Optional: 0-1, voice stability</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Speed</Form.Label>
+                      <Form.Control
+                        type="number"
+                        step="0.1"
+                        min="0.25"
+                        max="4"
+                        value={formData.speed}
+                        onChange={handleInputChange('speed')}
+                        placeholder="1.0"
+                      />
+                      <Form.Text className="text-muted">Optional: 0.25-4, speech speed</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={4}>
+                    <Form.Group>
+                      <Form.Label>Similarity Boost</Form.Label>
+                      <Form.Control
+                        type="number"
+                        step="0.1"
+                        min="0"
+                        max="1"
+                        value={formData.similarityBoost}
+                        onChange={handleInputChange('similarityBoost')}
+                        placeholder="0.75"
+                      />
+                      <Form.Text className="text-muted">Optional: 0-1, voice similarity</Form.Text>
+                    </Form.Group>
+                  </Col>
+
+                  {/* Platform Settings */}
+                  <Col xs={12} className="mt-4">
+                    <h6 className="mb-3 text-primary">Platform Settings</h6>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Check
+                        type="checkbox"
+                        id="recordCalls"
+                        label="Record Calls"
+                        checked={formData.recordCalls}
+                        onChange={handleInputChange('recordCalls')}
+                      />
+                      <Form.Text className="text-muted">Enable call recording for this agent</Form.Text>
+                    </Form.Group>
+                  </Col>
+                  <Col md={6}>
+                    <Form.Group>
+                      <Form.Check
+                        type="checkbox"
+                        id="debug"
+                        label="Debug Mode"
+                        checked={formData.debug}
+                        onChange={handleInputChange('debug')}
+                      />
+                      <Form.Text className="text-muted">Enable debug logging for this agent</Form.Text>
+                    </Form.Group>
+                  </Col>
+
+                  <Col xs={12} className="text-end mt-4">
+                    <Button type="submit" disabled={submitting} variant="primary">
                       {submitting ? (
                         <>
                           <span className="spinner-border spinner-border-sm me-2" role="status" />
