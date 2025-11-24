@@ -25,6 +25,26 @@ export type AdminAgent = {
 
 export type AssignmentFilter = 'all' | 'assigned' | 'unassigned'
 
+// Voice type from backend
+export type Voice = {
+  voice_id: string
+  name: string
+  preview_url?: string
+}
+
+export interface VoiceListResponse {
+  items: Voice[]
+  total: number
+  skip: number
+  limit: number
+}
+
+export interface VoiceQueryParams {
+  skip?: number
+  limit?: number
+  search?: string
+}
+
 export interface AdminAgentListResponse {
   items: AdminAgent[]
   total: number
