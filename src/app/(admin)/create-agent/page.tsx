@@ -75,13 +75,16 @@ const CreateAgentPage = () => {
   ]
 
   const llmModelOptions: LLMModelLiteral[] = [
-    'gpt-5', 'gpt-5.1', 'gpt-5-mini', 'gpt-5-nano',
-    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
-    'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo',
-    'claude-sonnet-4.5', 'claude-sonnet-4', 'claude-haiku-4.5',
-    'claude-3.7-sonnet', 'claude-3.5-sonnet', 'claude-3-haiku',
-    'gemini-3-pro-preview', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
-    'gemini-2.0-flash', 'gemini-2.0-flash-lite'
+    'gpt-5',
+    'gpt-5.1',
+    'gpt-5-mini',
+    'gpt-5-nano',
+    'claude-haiku-4.5',
+    'claude-3-haiku',
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-2.0-flash-lite'
   ]
 
   const handleInputChange = (field: keyof AgentFormState) => (
