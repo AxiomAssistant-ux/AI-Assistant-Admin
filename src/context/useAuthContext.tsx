@@ -127,10 +127,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = () => {
+    const isAdmin = user?.role === 'admin'
     authStorage.clearAuth()
     setToken(null)
     setUser(null)
-    router.push('/auth/sign-in')
+    router.push(isAdmin ? '/auth/admin/sign-in' : '/auth/sign-in')
   }
 
   const refreshUser = async () => {

@@ -8,6 +8,7 @@ import Spinner from '@/components/Spinner'
 interface AuthGuardProps {
   children: React.ReactNode
   requireRole?: 'admin' | 'user' | null
+  signInPath?: string
 }
 
 /**
@@ -15,25 +16,20 @@ interface AuthGuardProps {
  * Protects routes and ensures user is authenticated
  * Optionally requires specific role
  */
-export default function AuthGuard({ children, requireRole }: AuthGuardProps) {
+export default function AuthGuard({ children, requireRole, signInPath }: AuthGuardProps) {
   const { isAuthenticated, isLoading, user } = useAuth()
   const router = useRouter()
+  const loginPath = signInPath ?? (requireRole === 'admin' ? '/auth/admin/sign-in' : '/auth/sign-in')
 
   useEffect(() => {
     if (!isLoading) {
       if (!isAuthenticated) {
-        // Not authenticated, redirect to sign in
-        router.push('/auth/sign-in')
+        router.push(loginPath)
       } else if (requireRole && user?.role !== requireRole) {
-        // Authenticated but wrong role
-        if (user?.role === 'admin') {
-          router.push('/dashboards') // Admin can access admin pages
-        } else {
-          router.push('/dashboards') // Regular user
-        }
+        router.push('/dashboards')
       }
     }
-  }, [isAuthenticated, isLoading, user, requireRole, router])
+  }, [isAuthenticated, isLoading, user, requireRole, router, loginPath])
 
   // Show loading state while checking auth
   if (isLoading) {

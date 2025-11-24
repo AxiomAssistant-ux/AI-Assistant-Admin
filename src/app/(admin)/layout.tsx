@@ -11,7 +11,7 @@ const VerticalNavigationBar = dynamic(() => import('@/components/layout/Vertical
 
 const AdminLayout = ({ children }: ChildrenType) => {
   return (
-    <AuthGuard>
+    <AuthGuard signInPath="/auth/admin/sign-in">
       <div className="wrapper">
         <Suspense>
           <TopNavigationBar />
