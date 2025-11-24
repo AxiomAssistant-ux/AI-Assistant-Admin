@@ -9,12 +9,15 @@ import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { adminAgentApi } from '@/lib/admin-agent-api'
 import VoiceSelector from '@/components/VoiceSelector'
+import TagsInput from '@/components/TagsInput'
 import type {
   AdminAgent,
   AssignmentFilter,
   AudioFormatLiteral,
   CreateAgentPayload,
-  TurnEagernessLiteral
+  TurnEagernessLiteral,
+  LanguageLiteral,
+  LLMModelLiteral
 } from '@/types/admin-agent'
 import { toast } from 'react-toastify'
 
@@ -49,7 +52,7 @@ const getAgentIdentifier = (agent?: AdminAgent | null) => agent?.agent_id || age
 const buildEditFormState = (agent: AdminAgent): EditFormState => ({
   // Basic fields
   name: agent.name || '',
-  tags: (agent.tags || []).join(', '),
+  tags: agent.tags || [],
 
   // Agent config
   prompt: agent.conversation_config?.agent?.prompt?.prompt || '',
@@ -76,7 +79,7 @@ type AgentActionMode = 'view' | 'edit'
 type EditFormState = {
   // Basic fields
   name: string
-  tags: string
+  tags: string[]
 
   // Agent config
   prompt: string
@@ -99,7 +102,7 @@ type EditFormState = {
 
 const initialEditFormState: EditFormState = {
   name: '',
-  tags: '',
+  tags: [],
   prompt: '',
   llm: '',
   language: '',
@@ -141,6 +144,21 @@ const AgentsPage = () => {
   const [activeActionMode, setActiveActionMode] = useState<AgentActionMode | null>(null)
 
   const turnEagernessOptions: TurnEagernessLiteral[] = ['patient', 'normal', 'eager']
+
+  const languageOptions: LanguageLiteral[] = [
+    'en', 'es', 'fr', 'de', 'it', 'pt', 'ja', 'ko', 'zh', 'ar', 'hi', 'ru',
+    'nl', 'pl', 'sv', 'da', 'fi', 'no', 'cs', 'tr', 'el', 'he', 'id', 'ms', 'th', 'vi'
+  ]
+
+  const llmModelOptions: LLMModelLiteral[] = [
+    'gpt-5', 'gpt-5.1', 'gpt-5-mini', 'gpt-5-nano',
+    'gpt-4.1', 'gpt-4.1-mini', 'gpt-4.1-nano',
+    'gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo',
+    'claude-sonnet-4.5', 'claude-sonnet-4', 'claude-haiku-4.5',
+    'claude-3.7-sonnet', 'claude-3.5-sonnet', 'claude-3-haiku',
+    'gemini-3-pro-preview', 'gemini-2.5-flash', 'gemini-2.5-flash-lite',
+    'gemini-2.0-flash', 'gemini-2.0-flash-lite'
+  ]
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim()), 400)
@@ -320,11 +338,8 @@ const AgentsPage = () => {
       return
     }
 
-    // Build tags array
-    const tags = editForm.tags
-      .split(',')
-      .map((tag) => tag.trim())
-      .filter(Boolean)
+    // Tags are already an array
+    const tags = editForm.tags.filter(Boolean)
 
     // Build conversation_config (all fields optional for updates)
     const conversationConfig: Partial<CreateAgentPayload['conversation_config']> = {}
@@ -811,13 +826,12 @@ const AgentsPage = () => {
               </Col>
               <Col md={6}>
                 <Form.Group controlId="editAgentTags">
-                  <Form.Label>Tags</Form.Label>
-                  <Form.Control
-                    value={editForm.tags}
-                    onChange={handleEditInputChange('tags')}
-                    placeholder="sales, support, english"
+                  <TagsInput
+                    tags={editForm.tags}
+                    onChange={(tags) => setEditForm((prev) => ({ ...prev, tags }))}
+                    placeholder="Type and press Enter to add tags"
+                    label="Tags"
                   />
-                  <Form.Text className="text-muted">Comma separated tags (optional)</Form.Text>
                 </Form.Group>
               </Col>
 
@@ -828,12 +842,18 @@ const AgentsPage = () => {
               <Col md={6}>
                 <Form.Group controlId="editAgentLanguage">
                   <Form.Label>Language</Form.Label>
-                  <Form.Control
+                  <Form.Select
                     value={editForm.language}
                     onChange={handleEditInputChange('language')}
-                    placeholder="en"
-                  />
-                  <Form.Text className="text-muted">Primary language code (e.g., en, es, fr)</Form.Text>
+                  >
+                    <option value="">Select language (optional)</option>
+                    {languageOptions.map((lang) => (
+                      <option key={lang} value={lang}>
+                        {lang.toUpperCase()}
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Text className="text-muted">Primary language code</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
@@ -865,11 +885,17 @@ const AgentsPage = () => {
               <Col md={4}>
                 <Form.Group controlId="editAgentLLM">
                   <Form.Label>LLM Model</Form.Label>
-                  <Form.Control
+                  <Form.Select
                     value={editForm.llm}
                     onChange={handleEditInputChange('llm')}
-                    placeholder="gpt-4o-mini"
-                  />
+                  >
+                    <option value="">Select LLM model (optional)</option>
+                    {llmModelOptions.map((model) => (
+                      <option key={model} value={model}>
+                        {model}
+                      </option>
+                    ))}
+                  </Form.Select>
                   <Form.Text className="text-muted">Optional: LLM model identifier</Form.Text>
                 </Form.Group>
               </Col>
