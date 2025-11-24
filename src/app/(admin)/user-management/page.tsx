@@ -390,7 +390,7 @@ const UserManagementPage = () => {
 
     try {
       const payload: AdminUserUpdatePayload = {
-        agent_id: agentIdInput.trim() || null
+        agent_id: agentIdInput.trim() || ''
       }
       const response = await adminUserApi.updateUser(token, agentAssignmentUserId, payload)
       if (response.error) {
