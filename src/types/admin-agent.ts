@@ -10,15 +10,9 @@ export type AdminAgent = {
   description?: string
   default_language?: string
   additional_languages?: string[]
-  conversation_config?: {
-    agent?: {
-      name?: string
-      prompt?: {
-        prompt?: string
-        llm?: string
-      }
-    }
-  }
+  conversation_config?: AgentConversationConfig
+  workflow?: AgentWorkflow
+  platform_settings?: AgentPlatformSettings
   tts?: {
     voice_id?: string
     mode?: string
