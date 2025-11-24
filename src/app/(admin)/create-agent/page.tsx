@@ -8,6 +8,7 @@ import { toast } from 'react-toastify'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { adminAgentApi } from '@/lib/admin-agent-api'
+import VoiceSelector from '@/components/VoiceSelector'
 import type {
   AudioFormatLiteral,
   CreateAgentPayload,
@@ -348,15 +349,16 @@ const CreateAgentPage = () => {
                   </Col>
                   <Col md={6}>
                     <Form.Group>
-                      <Form.Label>Voice ID <span className="text-danger">*</span></Form.Label>
-                      <Form.Control
+                      <VoiceSelector
                         value={formData.voiceId}
-                        onChange={handleInputChange('voiceId')}
-                        placeholder="voice_123"
+                        onChange={(voiceId) => {
+                          setFormData((prev) => ({ ...prev, voiceId }))
+                          setFormErrors((prev) => ({ ...prev, voiceId: '' }))
+                        }}
+                        token={token}
                         isInvalid={!!formErrors.voiceId}
+                        errorMessage={formErrors.voiceId}
                       />
-                      <Form.Control.Feedback type="invalid">{formErrors.voiceId}</Form.Control.Feedback>
-                      <Form.Text className="text-muted">Required: ElevenLabs voice identifier</Form.Text>
                     </Form.Group>
                   </Col>
                   <Col md={6}>
