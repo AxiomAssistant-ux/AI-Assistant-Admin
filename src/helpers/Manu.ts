@@ -34,10 +34,16 @@ export const getMenuItems = (userRole?: 'admin' | 'user' | null): MenuItemType[]
         url: '/documents',
       },
       {
-        key: 'defaults',
-        label: 'Defaults',
-        icon: 'solar:settings-outline',
-        url: '/defaults',
+        key: 'subscription-management',
+        label: 'Subscription Management',
+        icon: 'solar:wallet-money-outline',
+        url: '/subscription-plans',
+      },
+      {
+        key: 'coupon-management',
+        label: 'Coupon Management',
+        icon: 'solar:ticket-sale-outline',
+        url: '/coupons',
       },
       {
         key: 'call-records',
