@@ -25,11 +25,11 @@ const SignIn = () => {
       email: yup
         .string()
         .trim()
-        .email('Please enter a valid email address')
-        .required('Email is required'),
+        .min(1, 'Email or username is required')
+        .required('Email or username is required'),
       password: yup
         .string()
-        .min(8, 'Password must be at least 8 characters')
+        .min(1, 'Password is required')
         .required('Password is required'),
     })
     .required()
@@ -115,10 +115,10 @@ const SignIn = () => {
                       <TextFormInput
                         control={control}
                         name="email"
-                        type="email"
-                        placeholder="Enter your email"
+                        type="text"
+                        placeholder="Enter your email or username"
                         className="form-control"
-                        label="Email Address"
+                        label="Email or Username"
                       />
                     </div>
                     <div className="mb-3">

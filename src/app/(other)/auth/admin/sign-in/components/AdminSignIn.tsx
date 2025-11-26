@@ -10,7 +10,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useEffect, useState } from 'react'
 import { Card, CardBody, Col, Row, Alert } from 'react-bootstrap'
-import { useForm } from 'react-hook-form'
+import { useForm, type Resolver } from 'react-hook-form'
 import * as yup from 'yup'
 import type { SignInRequest } from '@/types/auth'
 
@@ -20,10 +20,19 @@ const AdminSignIn = () => {
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
 
-  const messageSchema = yup.object({
-    email: yup.string().email('Please enter a valid email').required('Email is required'),
-    password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
-  })
+  const messageSchema: yup.ObjectSchema<SignInRequest> = yup
+    .object({
+      email: yup
+        .string()
+        .trim()
+        .min(1, 'Email or username is required')
+        .required('Email or username is required'),
+      password: yup
+        .string()
+        .min(1, 'Password is required')
+        .required('Password is required'),
+    })
+    .required()
 
   useEffect(() => {
     document.body.classList.add('authentication-bg')
@@ -38,31 +47,34 @@ const AdminSignIn = () => {
     }
   }, [isAuthenticated, router])
 
-  const { handleSubmit, control } = useForm({
+  const { handleSubmit, control } = useForm<SignInRequest>({
     defaultValues: {
       email: '',
       password: '',
     },
-    resolver: yupResolver(messageSchema),
+    resolver: yupResolver(messageSchema) as Resolver<SignInRequest>,
+    mode: 'onBlur', // Validate on blur for better UX
   })
 
-  const handleLogin = async (data: any) => {
+  const handleLogin = async (data: SignInRequest) => {
     try {
       setLoading(true)
       setError(null)
 
+      // Trim email before sending
       const signInData: SignInRequest = {
-        email: data.email,
+        email: data.email.trim(),
         password: data.password,
       }
 
       const result = await signIn(signInData, true) // true = admin login
 
       if (!result.success) {
-        setError(result.error || 'Admin sign in failed. Please check your credentials.')
+        setError(result.error || 'Admin sign in failed. Please check your credentials and try again.')
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.'
+      setError(errorMessage)
       console.error('Admin login error:', err)
     } finally {
       setLoading(false)
@@ -104,10 +116,10 @@ const AdminSignIn = () => {
                       <TextFormInput
                         control={control}
                         name="email"
-                        type="email"
-                        placeholder="Enter your admin email"
+                        type="text"
+                        placeholder="Enter your email or username"
                         className="form-control"
-                        label="Admin Email Address"
+                        label="Email or Username"
                       />
                     </div>
                     <div className="mb-3">
