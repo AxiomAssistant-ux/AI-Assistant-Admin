@@ -22,6 +22,7 @@ const SignUp = () => {
   const router = useRouter()
   const { signUp, isAuthenticated } = useAuth()
   const [error, setError] = useState<string | null>(null)
+  const [success, setSuccess] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
   const [showTermsModal, setShowTermsModal] = useState(false)
 
@@ -64,6 +65,10 @@ const SignUp = () => {
           'Password must contain at least one uppercase letter, one lowercase letter, one number, and one special character (@$!%*?&)'
         )
         .required('Password is required'),
+      confirm_password: yup
+        .string()
+        .required('Please confirm your password')
+        .oneOf([yup.ref('password')], 'Passwords must match'),
       acceptedTerms: yup
         .boolean()
         .oneOf([true], 'You must accept the terms and conditions')
@@ -76,6 +81,7 @@ const SignUp = () => {
       username: '',
       email: '',
       password: '',
+      confirm_password: '',
       acceptedTerms: false,
     },
     resolver: yupResolver(messageSchema) as Resolver<SignUpFormData>,
@@ -85,21 +91,35 @@ const SignUp = () => {
     try {
       setLoading(true)
       setError(null)
+      setSuccess(null)
 
       // Extract only the fields needed for the API (exclude acceptedTerms)
       const signUpData: SignUpRequest = {
         username: data.username.trim(),
         email: data.email.trim(),
         password: data.password,
+        confirm_password: data.confirm_password,
       }
 
       const result = await signUp(signUpData, false) // false = user signup
 
       if (!result.success) {
         setError(result.error || 'Sign up failed. Please try again.')
+        return
+      }
+
+      // For user signup, OTP is sent - show success message
+      if (result.data) {
+        const expiresMinutes = Math.ceil((result.data.expires_in || 600) / 60)
+        setSuccess(
+          `Verification code sent! Please check your email (${result.data.email}) for the OTP code. The code expires in ${expiresMinutes} minute${expiresMinutes !== 1 ? 's' : ''}.`
+        )
+        // Optionally redirect to OTP verification page or show OTP input
+        // For now, just show success message
       }
     } catch (err) {
-      setError('An unexpected error occurred. Please try again.')
+      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.'
+      setError(errorMessage)
       console.error('Signup error:', err)
     } finally {
       setLoading(false)
@@ -136,6 +156,12 @@ const SignUp = () => {
                       </Alert>
                     )}
 
+                    {success && (
+                      <Alert variant="success" className="mt-3" dismissible onClose={() => setSuccess(null)}>
+                        {success}
+                      </Alert>
+                    )}
+
                     <form onSubmit={handleSubmit(handleSignUp)} className="mt-4">
                       <div className="mb-3">
                         <TextFormInput
@@ -163,6 +189,15 @@ const SignUp = () => {
                           placeholder="Enter your password (min 8 characters)"
                           className="form-control"
                           label="Password"
+                        />
+                      </div>
+                      <div className="mb-3">
+                        <PasswordFormInput
+                          control={control}
+                          name="confirm_password"
+                          placeholder="Confirm your password"
+                          className="form-control"
+                          label="Confirm Password"
                         />
                       </div>
                       <div className="mb-3">
@@ -219,11 +254,6 @@ const SignUp = () => {
                   I already have an account&nbsp;
                   <Link href="/auth/sign-in" className="text-decoration-none text-white fw-bold">
                     Sign In
-                  </Link>
-                </p>
-                <p className="text-center mt-2">
-                  <Link href="/auth/admin/sign-up" className="text-decoration-none text-white text-opacity-75">
-                    Create Admin Account →
                   </Link>
                 </p>
               </Col>
