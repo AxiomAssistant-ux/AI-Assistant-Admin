@@ -28,6 +28,14 @@ export type SignUpRequest = {
   username: string
   email: string
   password: string
+  confirm_password: string
+}
+
+// Signup OTP response type
+export type SignupOTPRequestOut = {
+  email: string
+  expires_in: number
+  detail?: string
 }
 
 export type SignInRequest = {
