@@ -4,7 +4,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authApi } from '@/lib/auth-api'
 import { authStorage } from '@/lib/auth-storage'
-import type { UserOut, SignInRequest, SignUpRequest, TokenOut } from '@/types/auth'
+import type { UserOut, SignInRequest, SignUpRequest, SignupOTPRequestOut, TokenOut } from '@/types/auth'
 
 interface AuthContextType {
   user: UserOut | null
@@ -12,7 +12,7 @@ interface AuthContextType {
   isLoading: boolean
   isAuthenticated: boolean
   signIn: (data: SignInRequest, isAdmin?: boolean) => Promise<{ success: boolean; error?: string }>
-  signUp: (data: SignUpRequest, isAdmin?: boolean) => Promise<{ success: boolean; error?: string }>
+  signUp: (data: SignUpRequest, isAdmin?: boolean) => Promise<{ success: boolean; error?: string; data?: SignupOTPRequestOut }>
   signOut: () => void
   refreshUser: () => Promise<void>
 }
@@ -93,7 +93,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const signUp = async (
     data: SignUpRequest,
     isAdmin: boolean = false
-  ): Promise<{ success: boolean; error?: string }> => {
+  ): Promise<{ success: boolean; error?: string; data?: SignupOTPRequestOut }> => {
     try {
       setIsLoading(true)
 
@@ -108,13 +108,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
       }
 
-      // After successful signup, automatically sign in
-      const signInResult = await signIn(
-        { email: data.email, password: data.password },
-        isAdmin
-      )
-
-      return signInResult
+      // For user signup, return OTP response (account needs OTP verification)
+      // For admin signup, account is created immediately, so we can auto sign-in
+      if (isAdmin) {
+        // Admin signup creates account immediately, so auto sign-in
+        const signInResult = await signIn(
+          { email: data.email, password: data.password },
+          isAdmin
+        )
+        return signInResult
+      } else {
+        // User signup returns OTP - don't auto sign-in, return OTP response
+        return {
+          success: true,
+          data: response.data as SignupOTPRequestOut,
+        }
+      }
     } catch (error) {
       console.error('Sign up error:', error)
       return {
