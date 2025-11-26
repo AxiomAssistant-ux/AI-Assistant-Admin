@@ -22,8 +22,15 @@ const SignIn = () => {
 
   const messageSchema: yup.ObjectSchema<SignInRequest> = yup
     .object({
-      email: yup.string().email('Please enter a valid email').required('Email is required'),
-      password: yup.string().min(8, 'Password must be at least 8 characters').required('Password is required'),
+      email: yup
+        .string()
+        .trim()
+        .email('Please enter a valid email address')
+        .required('Email is required'),
+      password: yup
+        .string()
+        .min(8, 'Password must be at least 8 characters')
+        .required('Password is required'),
     })
     .required()
 
@@ -46,6 +53,7 @@ const SignIn = () => {
       password: '',
     },
     resolver: yupResolver(messageSchema) as Resolver<SignInRequest>,
+    mode: 'onBlur', // Validate on blur for better UX
   })
 
   const handleLogin = async (data: SignInRequest) => {
@@ -53,10 +61,16 @@ const SignIn = () => {
       setLoading(true)
       setError(null)
 
-      const result = await signIn(data, false) // false = user login
+      // Trim email before sending
+      const signInData: SignInRequest = {
+        email: data.email.trim(),
+        password: data.password,
+      }
+
+      const result = await signIn(signInData, false) // false = user login
 
       if (!result.success) {
-        setError(result.error || 'Sign in failed. Please check your credentials.')
+        setError(result.error || 'Sign in failed. Please check your credentials and try again.')
       }
     } catch (err) {
       setError('An unexpected error occurred. Please try again.')
@@ -143,7 +157,7 @@ const SignIn = () => {
               <p className="text-center mt-4 text-white text-opacity-50">
                 Don&apos;t have an account?
                 <Link href="/auth/sign-up" className="text-decoration-none text-white fw-bold ms-1">
-                  Sign Up
+              Contact Sales
                 </Link>
               </p>
               <p className="text-center mt-2">
