@@ -4,14 +4,14 @@
  */
 
 import { apiClient } from './api-client'
-import type { SignInRequest, SignUpRequest, TokenOut, UserOut } from '@/types/auth'
+import type { SignInRequest, SignUpRequest, SignupOTPRequestOut, TokenOut, UserOut } from '@/types/auth'
 
 export const authApi = {
   /**
-   * User Sign Up
+   * User Sign Up - Returns OTP response, not UserOut
    */
   async userSignUp(data: SignUpRequest) {
-    return apiClient.post<UserOut>('/auth/user/signup', data)
+    return apiClient.post<SignupOTPRequestOut>('/auth/user/signup', data)
   },
 
   /**
