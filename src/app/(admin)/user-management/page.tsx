@@ -308,7 +308,7 @@ const UserManagementPage = () => {
     }
   }
 
-  const handleEditUser = (userRecord: UserOut) => {
+  const handleEditUser = useCallback((userRecord: UserOut) => {
     setFormErrors({})
     setEditingUserId(userRecord.id)
     setFormData({
@@ -318,69 +318,78 @@ const UserManagementPage = () => {
     })
     setModalMode('edit')
     setShowModal(true)
-  }
+  }, [])
 
-  const handleToggleStatus = async (userRecord: UserOut) => {
-    if (!token) return
-    setBlockLoadingId(userRecord.id)
-    setError(null)
+  const handleToggleStatus = useCallback(
+    async (userRecord: UserOut) => {
+      if (!token) return
+      setBlockLoadingId(userRecord.id)
+      setError(null)
 
-    try {
-      const response = await adminUserApi.updateStatus(token, userRecord.id, !userRecord.blocked)
-      if (response.error) {
-        toast.error(response.error)
-      } else {
-        toast.success(userRecord.blocked ? 'User unblocked successfully' : 'User blocked successfully')
-        setUsers((prev) =>
-          prev.map((item) => (item.id === userRecord.id ? response.data ?? item : item))
-        )
+      try {
+        const response = await adminUserApi.updateStatus(token, userRecord.id, !userRecord.blocked)
+        if (response.error) {
+          toast.error(response.error)
+        } else {
+          toast.success(userRecord.blocked ? 'User unblocked successfully' : 'User blocked successfully')
+          setUsers((prev) =>
+            prev.map((item) => (item.id === userRecord.id ? response.data ?? item : item))
+          )
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Unable to update status')
+      } finally {
+        setBlockLoadingId(null)
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Unable to update status')
-    } finally {
-      setBlockLoadingId(null)
-    }
-  }
+    },
+    [token]
+  )
 
-  const handleDeleteUser = async (userRecord: UserOut) => {
-    if (!token) return
-    const confirmed = window.confirm(`Delete ${userRecord.username}? This action cannot be undone.`)
-    if (!confirmed) return
+  const handleDeleteUser = useCallback(
+    async (userRecord: UserOut) => {
+      if (!token) return
+      const confirmed = window.confirm(`Delete ${userRecord.username}? This action cannot be undone.`)
+      if (!confirmed) return
 
-    setDeleteLoadingId(userRecord.id)
-    setError(null)
+      setDeleteLoadingId(userRecord.id)
+      setError(null)
 
-    try {
-      const response = await adminUserApi.deleteUser(token, userRecord.id)
-      if (response.error) {
-        toast.error(response.error)
-      } else {
-        toast.success('User deleted successfully')
-        fetchUsers()
+      try {
+        const response = await adminUserApi.deleteUser(token, userRecord.id)
+        if (response.error) {
+          toast.error(response.error)
+        } else {
+          toast.success('User deleted successfully')
+          fetchUsers()
+        }
+      } catch (err) {
+        toast.error(err instanceof Error ? err.message : 'Unable to delete user')
+      } finally {
+        setDeleteLoadingId(null)
       }
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Unable to delete user')
-    } finally {
-      setDeleteLoadingId(null)
-    }
-  }
+    },
+    [token, fetchUsers]
+  )
 
-  const handleOpenAgentModal = async (userRecord: UserOut) => {
-    if (!token) {
-      toast.error('Authentication required')
-      return
-    }
-    setAgentLoadingId(userRecord.id)
-    setAgentAssignmentUserId(userRecord.id)
-    setAgentIdInput(userRecord.agent_id ?? '')
-    setModalMode('assign-agent')
-    setShowModal(true)
-    try {
-      await loadUnassignedAgents(userRecord.agent_id)
-    } finally {
-      setAgentLoadingId(null)
-    }
-  }
+  const handleOpenAgentModal = useCallback(
+    async (userRecord: UserOut) => {
+      if (!token) {
+        toast.error('Authentication required')
+        return
+      }
+      setAgentLoadingId(userRecord.id)
+      setAgentAssignmentUserId(userRecord.id)
+      setAgentIdInput(userRecord.agent_id ?? '')
+      setModalMode('assign-agent')
+      setShowModal(true)
+      try {
+        await loadUnassignedAgents(userRecord.agent_id)
+      } finally {
+        setAgentLoadingId(null)
+      }
+    },
+    [token, loadUnassignedAgents]
+  )
 
   const handleAssignAgent = async (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -414,12 +423,6 @@ const UserManagementPage = () => {
     }
   }
 
-  const statusBadge = (record: UserOut) => (
-    <Badge bg={record.blocked ? 'danger' : 'success'} className="px-2 py-1 text-uppercase">
-      {record.blocked ? 'Blocked' : 'Active'}
-    </Badge>
-  )
-
   const formatDate = (value: string) => {
     try {
       return new Intl.DateTimeFormat('en-US', {
@@ -442,6 +445,7 @@ const UserManagementPage = () => {
         align: 'center',
         width: 60,
         sticky: 'left',
+        defaultSticky: true,
         render: (_row, { rowIndex }) => (
           <span className="text-muted">
             {(currentPage - 1) * pageSize + rowIndex + 1}
@@ -453,6 +457,7 @@ const UserManagementPage = () => {
         header: 'User',
         minWidth: 200,
         sticky: 'left',
+        defaultSticky: true,
         render: (row) => (
           <div>
             <div className="fw-semibold">{row.username}</div>
@@ -498,7 +503,62 @@ const UserManagementPage = () => {
         header: 'Status',
         align: 'center',
         minWidth: 120,
-        render: (row) => statusBadge(row)
+        sticky: 'right',
+        defaultSticky: true,
+        render: (row) => {
+          const isLoading = blockLoadingId === row.id
+          return (
+            <div
+              onClick={() => !isLoading && handleToggleStatus(row)}
+              title={row.blocked ? 'Click to unblock user' : 'Click to block user'}
+              style={{
+                cursor: isLoading ? 'not-allowed' : 'pointer',
+                display: 'inline-block'
+              }}
+            >
+              <Badge
+                bg={row.blocked ? 'danger' : 'success'}
+                className={`px-2 py-1 text-uppercase d-inline-flex align-items-center gap-1 ${isLoading ? 'opacity-75' : ''}`}
+                style={{
+                  cursor: isLoading ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s ease',
+                  display: 'inline-flex'
+                }}
+                onMouseEnter={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.opacity = '0.85'
+                    e.currentTarget.style.transform = 'scale(1.08)'
+                    e.currentTarget.style.boxShadow = '0 2px 4px rgba(0,0,0,0.15)'
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isLoading) {
+                    e.currentTarget.style.opacity = '1'
+                    e.currentTarget.style.transform = 'scale(1)'
+                    e.currentTarget.style.boxShadow = 'none'
+                  }
+                }}
+              >
+                {isLoading ? (
+                  <>
+                    <span className="spinner-border spinner-border-sm" role="status" />
+                    <span>{row.blocked ? 'Blocked' : 'Active'}</span>
+                  </>
+                ) : (
+                  <>
+                    <span>{row.blocked ? 'Blocked' : 'Active'}</span>
+                    <IconifyIcon
+                      icon="solar:alt-arrow-right-linear"
+                      width={12}
+                      height={12}
+                      className="opacity-75"
+                    />
+                  </>
+                )}
+              </Badge>
+            </div>
+          )
+        }
       },
       {
         key: 'actions',
@@ -506,6 +566,7 @@ const UserManagementPage = () => {
         align: 'center',
         minWidth: 280,
         sticky: 'right',
+        defaultSticky: true,
         render: (row) => (
           <div className="d-flex gap-2 justify-content-center flex-wrap">
             <Button
@@ -515,27 +576,6 @@ const UserManagementPage = () => {
               title="Edit user"
             >
               <IconifyIcon icon="solar:pen-new-square-outline" width={16} height={16} />
-            </Button>
-            <Button
-              size="sm"
-              variant={row.blocked ? 'success' : 'warning'}
-              onClick={() => handleToggleStatus(row)}
-              title={row.blocked ? 'Unblock user' : 'Block user'}
-              disabled={blockLoadingId === row.id}
-              className="d-flex align-items-center gap-1"
-            >
-              {blockLoadingId === row.id ? (
-                <span className="spinner-border spinner-border-sm" role="status" />
-              ) : (
-                <>
-                  <IconifyIcon
-                    icon={row.blocked ? 'solar:unlock-outline' : 'solar:lock-keyhole-outline'}
-                    width={16}
-                    height={16}
-                  />
-                  <span>{row.blocked ? 'Unblock' : 'Block'}</span>
-                </>
-              )}
             </Button>
             <Button
               size="sm"
@@ -571,7 +611,18 @@ const UserManagementPage = () => {
         )
       }
     ],
-    [currentPage, pageSize, blockLoadingId, deleteLoadingId, agentLoadingId, users, allAgentsMap]
+    [
+      currentPage,
+      pageSize,
+      blockLoadingId,
+      deleteLoadingId,
+      agentLoadingId,
+      allAgentsMap,
+      handleToggleStatus,
+      handleEditUser,
+      handleDeleteUser,
+      handleOpenAgentModal
+    ]
   )
 
   const filters: DataTableFilterControl[] = [
@@ -693,6 +744,7 @@ const UserManagementPage = () => {
             tableContainerStyle={{
               maxHeight: 'calc(100vh - 350px)',
               overflowY: 'auto',
+              overflowX: 'auto',
               maxWidth: '100%'
             }}
           />

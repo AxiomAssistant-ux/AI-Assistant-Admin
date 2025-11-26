@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useState, ReactNode, CSSProperties } from 'react'
+import React, { useEffect, useMemo, useState, useRef, ReactNode, CSSProperties } from 'react'
 import {
   Badge,
   Button,
@@ -16,6 +16,7 @@ import {
   Table as BootstrapTable
 } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
+import useLocalStorage from '@/hooks/useLocalStorage'
 import type { DataTableProps, DataTableColumn } from './types'
 
 const DEFAULT_PAGE_SIZES = [10, 25, 50, 100]
@@ -70,6 +71,11 @@ function DataTable<T>({
     setColumnVisibility(derivedVisibility)
   }, [derivedVisibility])
 
+  // Get stable column keys to detect actual column changes (not just array reference)
+  const columnKeys = useMemo(() => columns.map((col) => col.key).sort().join(','), [columns])
+  const prevColumnKeysRef = useRef<string>('')
+
+  // Get default sticky state from column definitions
   const derivedSticky = useMemo(() => {
     const sticky: Record<string, boolean> = {}
     columns.forEach((column) => {
@@ -78,10 +84,65 @@ function DataTable<T>({
     return sticky
   }, [columns])
 
-  const [stickyColumns, setStickyColumns] = useState<Record<string, boolean>>(derivedSticky)
+  // Storage key for this specific table
+  const stickyStorageKey = `datatable-sticky-${id}`
+
+  // Initialize from localStorage, merging with defaultSticky
+  const [persistedSticky, setPersistedSticky] = useLocalStorage<Record<string, boolean>>(
+    stickyStorageKey,
+    {}
+  )
+
+  // Initialize sticky columns: merge persisted state with defaultSticky
+  const [stickyColumns, setStickyColumns] = useState<Record<string, boolean>>(() => {
+    // Initialize on first render only
+    const merged: Record<string, boolean> = { ...derivedSticky }
+    Object.keys(persistedSticky).forEach((key) => {
+      if (columns.some((col) => col.key === key)) {
+        merged[key] = persistedSticky[key]
+      }
+    })
+    return merged
+  })
+
+  // Only update sticky state when column keys actually change (new columns added/removed)
   useEffect(() => {
-    setStickyColumns(derivedSticky)
-  }, [derivedSticky])
+    // Initialize ref on first render
+    if (!prevColumnKeysRef.current) {
+      prevColumnKeysRef.current = columnKeys
+      return
+    }
+
+    // Only proceed if column keys actually changed
+    if (prevColumnKeysRef.current === columnKeys) {
+      return
+    }
+
+    const currentKeys = columns.map((col) => col.key)
+    const prevKeys = prevColumnKeysRef.current.split(',').filter(Boolean)
+
+    // Check if any columns were added or removed
+    const keysChanged =
+      currentKeys.length !== prevKeys.length ||
+      currentKeys.some((key) => !prevKeys.includes(key)) ||
+      prevKeys.some((key) => !currentKeys.includes(key))
+
+    if (keysChanged) {
+      // Merge: use persisted state for existing columns, defaultSticky for new columns
+      const merged: Record<string, boolean> = { ...derivedSticky }
+      currentKeys.forEach((key) => {
+        if (persistedSticky[key] !== undefined) {
+          merged[key] = persistedSticky[key]
+        }
+      })
+      setStickyColumns(merged)
+      // Update localStorage with merged state
+      setPersistedSticky(merged)
+    }
+
+    // Update ref to current keys
+    prevColumnKeysRef.current = columnKeys
+  }, [columnKeys, derivedSticky, persistedSticky, columns, setPersistedSticky])
 
   const [columnPanelOpen, setColumnPanelOpen] = useState(false)
 
@@ -142,11 +203,18 @@ function DataTable<T>({
         ? '2px 0 4px rgba(0,0,0,0.08)'
         : '-2px 0 4px rgba(0,0,0,0.08)'
 
+    // Background colors to prevent content bleeding through
+    // These match the CSS classes but provide inline fallback
+    const backgroundColor = isHeader
+      ? 'var(--bs-body-tertiary-bg, #f8f9fa)'
+      : 'var(--bs-body-bg, #ffffff)'
+
     return {
       position: 'sticky' as const,
       [side]: `${offset}px`,
-      zIndex: isHeader ? 102 : 100,
+      zIndex: isHeader ? 103 : 101, // Higher z-index to ensure sticky columns are above regular content
       boxShadow: isHeader ? 'none' : boxShadow,
+      backgroundColor,
       isolation: 'isolate' as const
     }
   }
@@ -159,15 +227,20 @@ function DataTable<T>({
   const handleStickyToggle = (columnKey: string) => {
     setStickyColumns((prev) => {
       const currentlySticky = prev[columnKey]
+      let newState: Record<string, boolean>
+
       if (currentlySticky) {
-        return { ...prev, [columnKey]: false }
+        newState = { ...prev, [columnKey]: false }
+      } else {
+        if (stickyEnabledCount >= maxSticky) {
+          return prev
+        }
+        newState = { ...prev, [columnKey]: true }
       }
 
-      if (stickyEnabledCount >= maxSticky) {
-        return prev
-      }
-
-      return { ...prev, [columnKey]: true }
+      // Persist to localStorage
+      setPersistedSticky(newState)
+      return newState
     })
   }
 
