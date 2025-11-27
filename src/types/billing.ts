@@ -11,7 +11,6 @@ export interface SubscriptionPlan {
   price: number
   currency: string
   billingFrequency: BillingFrequency
-  seatsIncluded: number
   minuteAllocation?: number
   features: string[]
   status: SubscriptionPlanStatus
@@ -27,7 +26,6 @@ export type SubscriptionPlanPayload = {
   price: number
   currency: string
   billingFrequency: BillingFrequency
-  seatsIncluded: number
   minuteAllocation?: number
   features: string[]
   status: SubscriptionPlanStatus

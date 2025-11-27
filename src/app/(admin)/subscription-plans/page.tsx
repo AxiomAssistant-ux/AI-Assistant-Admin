@@ -1,7 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge, Button, Col, Form, Modal, Row } from 'react-bootstrap'
+import { Badge, Button, Col, Form, Modal, Row, InputGroup } from 'react-bootstrap'
 import { toast } from 'react-toastify'
 import { DataTable } from '@/components/table'
 import type { DataTableColumn, DataTableFilterControl } from '@/components/table'
@@ -23,9 +23,7 @@ type PlanFormState = {
   tier: SubscriptionTier
   description: string
   price: string
-  currency: string
   billingFrequency: BillingFrequency
-  seatsIncluded: string
   minuteAllocation: string
   features: string[]
   status: SubscriptionPlanStatus
@@ -37,9 +35,7 @@ const DEFAULT_FORM_STATE: PlanFormState = {
   tier: 'basic',
   description: '',
   price: '0',
-  currency: 'USD',
   billingFrequency: 'monthly',
-  seatsIncluded: '1',
   minuteAllocation: '',
   features: [],
   status: 'draft',
@@ -57,7 +53,6 @@ const DEMO_PLANS: SubscriptionPlan[] = [
     price: 19,
     currency: 'USD',
     billingFrequency: 'monthly',
-    seatsIncluded: 5,
     minuteAllocation: 500,
     features: ['Up to 5 seats', 'Shared inbox', 'Email support'],
     status: 'active',
@@ -73,7 +68,6 @@ const DEMO_PLANS: SubscriptionPlan[] = [
     price: 69,
     currency: 'USD',
     billingFrequency: 'monthly',
-    seatsIncluded: 25,
     minuteAllocation: 2500,
     features: ['Advanced analytics', 'Workflow automation', 'Priority chat support'],
     status: 'active',
@@ -89,7 +83,6 @@ const DEMO_PLANS: SubscriptionPlan[] = [
     price: 149,
     currency: 'USD',
     billingFrequency: 'annual',
-    seatsIncluded: 100,
     minuteAllocation: 10000,
     features: ['Dedicated CSM', 'SSO/SAML', 'Unlimited playbooks'],
     status: 'inactive',
@@ -224,7 +217,7 @@ const SubscriptionPlansPage = () => {
     const { name, value } = event.target
     setFormState((prev) => ({
       ...prev,
-      [name]: name === 'currency' ? value.toUpperCase() : value
+      [name]: value
     }))
     if (formErrors[name as keyof PlanFormState]) {
       setFormErrors((prev) => ({ ...prev, [name]: undefined }))
@@ -247,9 +240,7 @@ const SubscriptionPlansPage = () => {
       tier: plan.tier,
       description: plan.description ?? '',
       price: plan.price.toString(),
-      currency: plan.currency ?? 'USD',
       billingFrequency: plan.billingFrequency,
-      seatsIncluded: plan.seatsIncluded?.toString() ?? '0',
       minuteAllocation: plan.minuteAllocation?.toString() ?? '',
       features: plan.features ?? [],
       status: plan.status,
@@ -276,11 +267,6 @@ const SubscriptionPlansPage = () => {
       nextErrors.price = 'Enter a valid positive price.'
     }
 
-    const seats = parseInt(formState.seatsIncluded, 10)
-    if (Number.isNaN(seats) || seats < 1) {
-      nextErrors.seatsIncluded = 'At least one seat is required.'
-    }
-
     const trial = parseInt(formState.trialDays, 10)
     if (Number.isNaN(trial) || trial < 0) {
       nextErrors.trialDays = 'Trial days cannot be negative.'
@@ -303,9 +289,8 @@ const SubscriptionPlansPage = () => {
       tier: formState.tier,
       description: formState.description.trim() || undefined,
       price: parseFloat(formState.price),
-      currency: (formState.currency || 'USD').toUpperCase(),
+      currency: 'USD',
       billingFrequency: formState.billingFrequency,
-      seatsIncluded: parseInt(formState.seatsIncluded, 10),
       minuteAllocation: formState.minuteAllocation ? parseInt(formState.minuteAllocation, 10) : undefined,
       features: formState.features,
       status: formState.status,
@@ -427,13 +412,6 @@ const SubscriptionPlansPage = () => {
             <small className="text-muted text-uppercase">{plan.billingFrequency}</small>
           </div>
         )
-      },
-      {
-        key: 'seats',
-        header: 'Seats',
-        width: 110,
-        align: 'center',
-        render: (plan) => plan.seatsIncluded || '—'
       },
       {
         key: 'features',
@@ -593,25 +571,23 @@ const SubscriptionPlansPage = () => {
             </Row>
 
             <Row className="g-3 mt-1">
-              <Col md={4}>
+              <Col md={5}>
                 <Form.Group controlId="plan-price">
                   <Form.Label>Price</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min="0"
-                    step="0.01"
-                    name="price"
-                    value={formState.price}
-                    onChange={handleInputChange}
-                    isInvalid={Boolean(formErrors.price)}
-                  />
+                  <InputGroup>
+                    <InputGroup.Text>USD</InputGroup.Text>
+                    <Form.Control
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      name="price"
+                      value={formState.price}
+                      onChange={handleInputChange}
+                      isInvalid={Boolean(formErrors.price)}
+                    />
+                  </InputGroup>
                   <Form.Control.Feedback type="invalid">{formErrors.price}</Form.Control.Feedback>
-                </Form.Group>
-              </Col>
-              <Col md={2}>
-                <Form.Group controlId="plan-currency">
-                  <Form.Label>Currency</Form.Label>
-                  <Form.Control name="currency" value={formState.currency} onChange={handleInputChange} maxLength={3} />
+                  <Form.Text className="text-muted">All subscription pricing is billed in USD.</Form.Text>
                 </Form.Group>
               </Col>
               <Col md={3}>
@@ -644,22 +620,7 @@ const SubscriptionPlansPage = () => {
             </Row>
 
             <Row className="g-3 mt-1">
-              <Col md={4}>
-                <Form.Group controlId="plan-seats">
-                  <Form.Label>Seats included</Form.Label>
-                  <Form.Control
-                    type="number"
-                    min="1"
-                    step="1"
-                    name="seatsIncluded"
-                    value={formState.seatsIncluded}
-                    onChange={handleInputChange}
-                    isInvalid={Boolean(formErrors.seatsIncluded)}
-                  />
-                  <Form.Control.Feedback type="invalid">{formErrors.seatsIncluded}</Form.Control.Feedback>
-                </Form.Group>
-              </Col>
-              <Col md={4}>
+              <Col md={6}>
                 <Form.Group controlId="plan-minutes">
                   <Form.Label>Minutes allocation (optional)</Form.Label>
                   <Form.Control
