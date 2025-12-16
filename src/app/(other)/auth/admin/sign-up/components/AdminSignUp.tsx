@@ -147,7 +147,28 @@ const AdminSignUp = () => {
                         <div className="form-check">
                           <input type="checkbox" className="form-check-input" id="checkbox-signin" required />
                           <label className="form-check-label" htmlFor="checkbox-signin">
-                            I accept Terms and Conditions
+                            I agree to receive recurring automated text messages at the phone
+                            number provided. Msg & data rates may apply. Msg frequency varies.
+                            Reply HELP for help and STOP to end. View our{' '}
+                            <a
+                              href="https://assistant.axiomsolinc.com/terms"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-decoration-underline"
+                              style={{ cursor: 'pointer' }}
+                            >
+                              Terms of Service
+                            </a>{' '}
+                            and{' '}
+                            <a
+                              href="https://assistant.axiomsolinc.com/privacy"
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-decoration-underline"
+                              style={{ cursor: 'pointer' }}
+                            >
+                              Privacy Policy
+                            </a>
                           </label>
                         </div>
                       </div>

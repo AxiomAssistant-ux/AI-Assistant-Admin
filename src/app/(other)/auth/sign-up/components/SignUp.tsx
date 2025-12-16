@@ -218,7 +218,7 @@ const SignUp = () => {
                                     number provided. Msg & data rates may apply. Msg frequency varies.
                                     Reply HELP for help and STOP to end. View our{' '}
                                     <a
-                                      href="https://axiom-assistant-frontend.vercel.app/terms"
+                                      href="https://assistant.axiomsolinc.com/terms"
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-decoration-underline"
@@ -228,7 +228,7 @@ const SignUp = () => {
                                     </a>{' '}
                                     and{' '}
                                     <a
-                                      href="https://axiom-assistant-frontend.vercel.app/privacy"
+                                      href="https://assistant.axiomsolinc.com/privacy"
                                       target="_blank"
                                       rel="noopener noreferrer"
                                       className="text-decoration-underline"
