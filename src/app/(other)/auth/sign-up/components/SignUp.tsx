@@ -213,19 +213,30 @@ const SignUp = () => {
                                 onChange={(e) => field.onChange(e.target.checked)}
                                 isInvalid={!!errors.acceptedTerms}
                                 label={
-                                  <span>
-                                    I accept the{' '}
-                                    <button
-                                      type="button"
-                                      className="btn btn-link p-0 text-decoration-underline"
-                                      onClick={(e) => {
-                                        e.preventDefault()
-                                        setShowTermsModal(true)
-                                      }}
-                                      style={{ fontSize: 'inherit', verticalAlign: 'baseline' }}
+                                  <span style={{ fontSize: "0.9rem" }}>
+                                    I agree to receive recurring automated text messages at the phone
+                                    number provided. Msg & data rates may apply. Msg frequency varies.
+                                    Reply HELP for help and STOP to end. View our{' '}
+                                    <a
+                                      href="https://axiom-assistant-frontend.vercel.app/terms"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-decoration-underline"
+                                      style={{ cursor: 'pointer' }}
                                     >
-                                      Terms and Conditions
-                                    </button>
+                                      Terms of Service
+                                    </a>{' '}
+                                    and{' '}
+                                    <a
+                                      href="https://axiom-assistant-frontend.vercel.app/privacy"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      className="text-decoration-underline"
+                                      style={{ cursor: 'pointer' }}
+                                    >
+                                      Privacy Policy
+                                    </a>
+
                                   </span>
                                 }
                               />
@@ -262,179 +273,6 @@ const SignUp = () => {
         </div>
       </div>
 
-      {/* Terms and Conditions Modal */}
-      <Modal
-        show={showTermsModal}
-        onHide={() => setShowTermsModal(false)}
-        size="lg"
-        centered
-        scrollable
-      >
-        <ModalHeader closeButton>
-          <ModalTitle>Terms and Conditions</ModalTitle>
-        </ModalHeader>
-        <ModalBody style={{ maxHeight: '70vh', overflowY: 'auto' }}>
-          <div className="terms-content">
-            <h5 className="fw-bold mb-3">1. Acceptance of Terms</h5>
-            <p className="mb-3">
-              By creating an account and using our services, you agree to be bound by these Terms and Conditions.
-              If you do not agree to these terms, please do not use our services.
-            </p>
-
-            <h5 className="fw-bold mb-3">2. Account Registration</h5>
-            <p className="mb-3">
-              To access our services, you must create an account by providing accurate, current, and complete information.
-              You are responsible for maintaining the confidentiality of your account credentials and for all activities
-              that occur under your account. You agree to notify us immediately of any unauthorized use of your account.
-            </p>
-
-            <h5 className="fw-bold mb-3">3. Communication and Messaging</h5>
-            <p className="mb-3">
-              By creating an account, you consent to receive communications from us via email, SMS, in-app messages,
-              and other electronic means. These communications may include:
-            </p>
-            <ul className="mb-3">
-              <li>Account verification and security notifications</li>
-              <li>Service updates and announcements</li>
-              <li>Marketing and promotional materials</li>
-              <li>Transactional messages related to your account</li>
-              <li>Customer support communications</li>
-            </ul>
-            <p className="mb-3">
-              You may opt-out of marketing communications at any time by following the unsubscribe instructions
-              provided in each message or by contacting our support team.
-            </p>
-
-            <h5 className="fw-bold mb-3">4. Email Communications</h5>
-            <p className="mb-3">
-              We will send you emails for important account-related activities, including but not limited to:
-            </p>
-            <ul className="mb-3">
-              <li>Account verification and password reset requests</li>
-              <li>Security alerts and login notifications</li>
-              <li>Service updates and maintenance notifications</li>
-              <li>Billing and payment confirmations</li>
-              <li>Product updates and feature announcements</li>
-            </ul>
-            <p className="mb-3">
-              You acknowledge that these emails are essential for the security and operation of your account
-              and cannot be disabled.
-            </p>
-
-            <h5 className="fw-bold mb-3">5. User Responsibilities</h5>
-            <p className="mb-3">You agree to:</p>
-            <ul className="mb-3">
-              <li>Provide accurate and truthful information during registration</li>
-              <li>Maintain the security of your account credentials</li>
-              <li>Use the service in compliance with all applicable laws and regulations</li>
-              <li>Not engage in any activity that may harm, disrupt, or interfere with the service</li>
-              <li>Not share your account credentials with third parties</li>
-              <li>Notify us immediately of any security breaches or unauthorized access</li>
-            </ul>
-
-            <h5 className="fw-bold mb-3">6. Privacy and Data Protection</h5>
-            <p className="mb-3">
-              Your privacy is important to us. We collect, use, and protect your personal information in accordance
-              with our Privacy Policy. By using our services, you consent to the collection and use of your information
-              as described in our Privacy Policy. We implement industry-standard security measures to protect your data,
-              but no method of transmission over the internet is 100% secure.
-            </p>
-
-            <h5 className="fw-bold mb-3">7. Service Availability</h5>
-            <p className="mb-3">
-              We strive to provide continuous access to our services but do not guarantee uninterrupted or error-free service.
-              We reserve the right to modify, suspend, or discontinue any aspect of the service at any time with or without notice.
-              We are not liable for any loss or damage resulting from service interruptions or modifications.
-            </p>
-
-            <h5 className="fw-bold mb-3">8. Intellectual Property</h5>
-            <p className="mb-3">
-              All content, features, and functionality of our service, including but not limited to text, graphics, logos,
-              icons, images, and software, are the exclusive property of our company and are protected by international
-              copyright, trademark, and other intellectual property laws. You may not reproduce, distribute, modify,
-              or create derivative works from any content without our express written permission.
-            </p>
-
-            <h5 className="fw-bold mb-3">9. Prohibited Activities</h5>
-            <p className="mb-3">You agree not to:</p>
-            <ul className="mb-3">
-              <li>Use the service for any illegal or unauthorized purpose</li>
-              <li>Violate any laws in your jurisdiction</li>
-              <li>Transmit any viruses, malware, or malicious code</li>
-              <li>Attempt to gain unauthorized access to our systems or other users&apos; accounts</li>
-              <li>Interfere with or disrupt the service or servers</li>
-              <li>Use automated systems to access the service without permission</li>
-              <li>Impersonate any person or entity</li>
-            </ul>
-
-            <h5 className="fw-bold mb-3">10. Account Termination</h5>
-            <p className="mb-3">
-              We reserve the right to suspend or terminate your account at any time, with or without cause or notice,
-              for any reason including but not limited to violation of these Terms and Conditions. Upon termination,
-              your right to use the service will immediately cease. You may also terminate your account at any time
-              by contacting our support team.
-            </p>
-
-            <h5 className="fw-bold mb-3">11. Limitation of Liability</h5>
-            <p className="mb-3">
-              To the maximum extent permitted by law, we shall not be liable for any indirect, incidental, special,
-              consequential, or punitive damages, or any loss of profits or revenues, whether incurred directly or indirectly,
-              or any loss of data, use, goodwill, or other intangible losses resulting from your use of the service.
-            </p>
-
-            <h5 className="fw-bold mb-3">12. Indemnification</h5>
-            <p className="mb-3">
-              You agree to indemnify, defend, and hold harmless our company, its officers, directors, employees,
-              and agents from any claims, damages, losses, liabilities, and expenses (including legal fees) arising
-              from your use of the service or violation of these Terms and Conditions.
-            </p>
-
-            <h5 className="fw-bold mb-3">13. Changes to Terms</h5>
-            <p className="mb-3">
-              We reserve the right to modify these Terms and Conditions at any time. We will notify you of any material
-              changes via email or through the service. Your continued use of the service after such modifications
-              constitutes your acceptance of the updated terms.
-            </p>
-
-            <h5 className="fw-bold mb-3">14. Governing Law</h5>
-            <p className="mb-3">
-              These Terms and Conditions shall be governed by and construed in accordance with applicable laws,
-              without regard to conflict of law principles. Any disputes arising from these terms shall be resolved
-              through binding arbitration or in the appropriate courts.
-            </p>
-
-            <h5 className="fw-bold mb-3">15. Contact Information</h5>
-            <p className="mb-3">
-              If you have any questions about these Terms and Conditions, please contact us through our support channels
-              or email us at the address provided in our contact information.
-            </p>
-
-            <div className="mt-4 p-3 bg-light rounded">
-              <p className="mb-0 small text-muted">
-                <strong>Last Updated:</strong> {new Date().toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric'
-                })}
-              </p>
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button variant="secondary" onClick={() => setShowTermsModal(false)}>
-            Close
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setShowTermsModal(false)
-              // Optionally auto-check the terms checkbox when user closes after viewing
-            }}
-          >
-            I Understand
-          </Button>
-        </ModalFooter>
-      </Modal>
     </>
   )
 }
