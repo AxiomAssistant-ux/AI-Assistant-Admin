@@ -9,6 +9,7 @@ import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { couponApi } from '@/lib/coupon-api'
 import { subscriptionApi } from '@/lib/subscription-api'
+import Link from 'next/link'
 import type {
   Coupon,
   CouponPayload,
@@ -529,6 +530,38 @@ const CouponManagementPage = () => {
 
   return (
     <>
+      <Row>
+        <Col xs={12}>
+          <div className="page-title-box d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+              <h4 className="mb-2">Coupons and Promotions</h4>
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item">
+                  <Link href="/">AI Assisstant</Link>
+                </li>
+                <div className="mx-1" style={{ height: 24, paddingRight: '8px' }}>
+                  <IconifyIcon icon="bx:chevron-right" height={16} width={16} />
+                </div>
+                <li className="breadcrumb-item active">Coupons Management</li>
+              </ol>
+            </div>
+            <Button variant="primary" onClick={openCreateModal} className="d-inline-flex align-items-center gap-2">
+              <IconifyIcon icon="solar:add-circle-bold" width={18} height={18} />
+              Create Plan
+            </Button>
+          </div>
+        </Col>
+      </Row>
+      <div className="d-flex justify-content-end mb-3">
+        <Button
+          variant="primary"
+          onClick={openCreateModal}
+          className="d-inline-flex align-items-center gap-2"
+        >
+          <IconifyIcon icon="solar:add-circle-bold" width={18} height={18} />
+          New coupon
+        </Button>
+      </div>
       <DataTable
         id='coupon-management'
         title='Coupon Management'
@@ -549,12 +582,12 @@ const CouponManagementPage = () => {
             placeholder: 'Search coupons or codes...'
           },
           filters: toolbarFilters,
-          extra: (
-            <Button variant='primary' onClick={openCreateModal} className='d-inline-flex align-items-center gap-2'>
-              <IconifyIcon icon='solar:add-circle-bold' width={18} height={18} />
-              New coupon
-            </Button>
-          )
+          // extra: (
+          //   <Button variant='primary' onClick={openCreateModal} className='d-inline-flex align-items-center gap-2'>
+          //     <IconifyIcon icon='solar:add-circle-bold' width={18} height={18} />
+          //     New coupon
+          //   </Button>
+          // )
         }}
         pagination={{
           currentPage,

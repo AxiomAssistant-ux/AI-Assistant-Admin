@@ -1,10 +1,17 @@
+// src/context/useAuthContext.tsx
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { authApi } from '@/lib/auth-api'
 import { authStorage } from '@/lib/auth-storage'
-import type { UserOut, SignInRequest, SignUpRequest, SignupOTPRequestOut, TokenOut } from '@/types/auth'
+import type {
+  UserOut,
+  SignInRequest,
+  SignUpRequest,
+  SignupOTPRequestOut,
+  TokenOut,
+} from '@/types/auth'
 
 interface AuthContextType {
   user: UserOut | null
@@ -25,7 +32,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
 
-  // Initialize auth state from localStorage
+  // ===============================
+  // Init from storage
+  // ===============================
   useEffect(() => {
     const initAuth = () => {
       const storedToken = authStorage.getToken()
@@ -44,6 +53,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     initAuth()
   }, [])
 
+  // ===============================
+  // Sign In
+  // ===============================
   const signIn = async (
     data: SignInRequest,
     isAdmin: boolean = false
@@ -56,40 +68,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : await authApi.userSignIn(data)
 
       if (response.error || !response.data) {
-        return {
-          success: false,
-          error: response.error || 'Sign in failed',
-        }
+        return { success: false, error: response.error || 'Sign in failed' }
       }
 
       const tokenData = response.data as TokenOut
+      
+      // Platform admins get 'platform', org users get 'org'
+      const actor: 'platform' | 'org' = isAdmin ? 'platform' : 'org'
 
-      // Save to localStorage
-      authStorage.saveAuth(tokenData)
-
-      // Update state
-      setToken(tokenData.access_token)
-      setUser(tokenData.user)
-
-      // Redirect based on role
-      if (tokenData.user.role === 'admin') {
-        router.push('/dashboards')
-      } else {
-        router.push('/dashboards')
+      const userWithActor: UserOut = {
+        ...tokenData.user,
+        actor,
       }
+
+      authStorage.saveAuth({
+        ...tokenData,
+        user: userWithActor,
+      })
+
+      setToken(tokenData.access_token)
+      setUser(userWithActor)
+
+      const redirectPath = actor === 'platform' ? '/dashboard' : '/dashboards'
+      
+      console.log('🔐 SignIn Success:', {
+        isAdmin,
+        actor,
+        redirectPath,
+        user: userWithActor
+      })
+
+      // Route correctly based on actor
+      router.push(redirectPath)
 
       return { success: true }
     } catch (error) {
       console.error('Sign in error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An error occurred',
-      }
+      return { success: false, error: error instanceof Error ? error.message : 'An error occurred' }
     } finally {
       setIsLoading(false)
     }
   }
 
+  // ===============================
+  // Sign Up
+  // ===============================
   const signUp = async (
     data: SignUpRequest,
     isAdmin: boolean = false
@@ -102,65 +125,55 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         : await authApi.userSignUp(data)
 
       if (response.error || !response.data) {
-        return {
-          success: false,
-          error: response.error || 'Sign up failed',
-        }
+        return { success: false, error: response.error || 'Sign up failed' }
       }
 
-      // For user signup, return OTP response (account needs OTP verification)
-      // For admin signup, account is created immediately, so we can auto sign-in
       if (isAdmin) {
-        // Admin signup creates account immediately, so auto sign-in
-        const signInResult = await signIn(
-          { email: data.email, password: data.password },
-          isAdmin
-        )
-        return signInResult
-      } else {
-        // User signup returns OTP - don't auto sign-in, return OTP response
-        return {
-          success: true,
-          data: response.data as SignupOTPRequestOut,
-        }
+        return await signIn({ email: data.email, password: data.password }, true)
       }
+
+      return { success: true, data: response.data as SignupOTPRequestOut }
     } catch (error) {
       console.error('Sign up error:', error)
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'An error occurred',
-      }
+      return { success: false, error: error instanceof Error ? error.message : 'An error occurred' }
     } finally {
       setIsLoading(false)
     }
   }
 
+  // ===============================
+  // Sign Out
+  // ===============================
   const signOut = () => {
-    const isAdmin = user?.role === 'admin'
+    const actor = user?.actor
     authStorage.clearAuth()
     setToken(null)
     setUser(null)
-    router.push(isAdmin ? '/auth/admin/sign-in' : '/auth/sign-in')
+    router.push(actor === 'platform' ? '/auth/admin/sign-in' : '/auth/sign-in')
   }
 
+  // ===============================
+  // Refresh User
+  // ===============================
   const refreshUser = async () => {
     const currentToken = authStorage.getToken()
     if (!currentToken) return
 
     try {
       const response = await authApi.getUserProfile(currentToken)
-      if (response.data) {
-        setUser(response.data as UserOut)
-        // Update stored user
-        const storedUser = authStorage.getUser()
-        if (storedUser) {
-          authStorage.saveAuth({
-            access_token: currentToken,
-            token_type: 'bearer',
-            expires_in: 3600, // Default value
-            user: response.data as UserOut,
-          })
+      if (response.data && user?.actor) {
+        const refreshedUser: UserOut = {
+          ...response.data,
+          actor: user.actor,
         }
+
+        setUser(refreshedUser)
+        authStorage.saveAuth({
+          access_token: currentToken,
+          token_type: 'bearer',
+          expires_in: 3600,
+          user: refreshedUser,
+        })
       }
     } catch (error) {
       console.error('Error refreshing user:', error)
@@ -183,9 +196,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider')
-  }
+  if (!context) throw new Error('useAuth must be used within an AuthProvider')
   return context
 }
-

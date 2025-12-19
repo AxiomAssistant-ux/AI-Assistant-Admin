@@ -1,12 +1,23 @@
-// User types matching backend API response
+// ===============================
+// Actor Types
+// ===============================
+export type ActorType = 'org' | 'platform'
+
+// ===============================
+// User types matching backend API
+// ===============================
 export type UserOut = {
   id: string
   username: string
   email: string
-  role: 'admin' | 'user'
+  role: 'admin' | 'user'          // org-level role
   agent_id: string | null
   created_at: string
   blocked: boolean
+
+  // 🔴 Frontend-augmented fields (SAFE)
+  actor?: ActorType               // 'org' | 'platform'
+  org_id?: string                 // optional (future-safe)
 }
 
 export type TokenOut = {
@@ -23,7 +34,9 @@ export type AdminUserListResponse = {
   limit: number
 }
 
+// ===============================
 // Auth request types
+// ===============================
 export type SignUpRequest = {
   username: string
   email: string
@@ -31,7 +44,6 @@ export type SignUpRequest = {
   confirm_password: string
 }
 
-// Signup OTP response type
 export type SignupOTPRequestOut = {
   email: string
   expires_in: number
@@ -43,7 +55,7 @@ export type SignInRequest = {
   password: string
 }
 
-// Legacy type for backward compatibility
+// Legacy type (unchanged)
 export type UserType = {
   id: string
   username: string

@@ -1,14 +1,17 @@
 'use client'
+
 import React from 'react'
 import AppMenu from './components/AppMenu'
-import { getMenuItems } from '@/helpers/Manu'
 import SimplebarReactClient from '@/components/wrapper/SimplebarReactClient'
 import LogoBox from '@/components/wrapper/LogoBox'
 import { useAuth } from '@/context/useAuthContext'
+import { getMenuItems } from '@/helpers/Manu'
 
 const Page = () => {
   const { user } = useAuth()
-  const menuItems = getMenuItems(user?.role || null)
+
+  const menuItems = getMenuItems(user?.actor ?? null)
+
   return (
     <div className="app-sidebar">
       <LogoBox />

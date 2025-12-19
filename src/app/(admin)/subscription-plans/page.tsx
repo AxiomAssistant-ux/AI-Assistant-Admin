@@ -17,6 +17,7 @@ import {
   type SubscriptionTier
 } from '@/types/billing'
 import { formatCurrencyValue, formatDateTime, getPlanStatusVariant } from '@/helpers/billing'
+import Link from 'next/link'
 
 type PlanFormState = {
   name: string
@@ -497,6 +498,28 @@ const SubscriptionPlansPage = () => {
 
   return (
     <>
+      <Row>
+        <Col xs={12}>
+          <div className="page-title-box d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
+            <div>
+              <h4 className="mb-2">Subscription Plans</h4>
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item">
+                  <Link href="/">AI Assisstant</Link>
+                </li>
+                <div className="mx-1" style={{ height: 24, paddingRight: '8px' }}>
+                  <IconifyIcon icon="bx:chevron-right" height={16} width={16} />
+                </div>
+                <li className="breadcrumb-item active">Subscription Plans</li>
+              </ol>
+            </div>
+            <Button variant="primary" onClick={openCreateModal} className="d-inline-flex align-items-center gap-2">
+              <IconifyIcon icon="solar:add-circle-bold" width={18} height={18} />
+              Create Plan
+            </Button>
+          </div>
+        </Col>
+      </Row>
       <DataTable
         id="subscription-plans"
         title="Subscription Management"
@@ -517,12 +540,6 @@ const SubscriptionPlansPage = () => {
             placeholder: 'Search plans or tiers...'
           },
           filters: toolbarFilters,
-          extra: (
-            <Button variant="primary" onClick={openCreateModal} className="d-inline-flex align-items-center gap-2">
-              <IconifyIcon icon="solar:add-circle-bold" width={18} height={18} />
-              Create Plan
-            </Button>
-          )
         }}
         pagination={{
           currentPage,
