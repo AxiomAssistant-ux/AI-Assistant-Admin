@@ -24,9 +24,8 @@ const SignIn = () => {
     .object({
       email: yup
         .string()
-        .trim()
-        .min(1, 'Email or username is required')
-        .required('Email or username is required'),
+        .email('Please enter a valid email')
+        .required('Email is required'),
       password: yup
         .string()
         .min(1, 'Password is required')
@@ -37,14 +36,11 @@ const SignIn = () => {
   useEffect(() => {
     document.body.classList.add('authentication-bg')
 
-    // 🔴 FIX: Check both authentication AND actor type
+    // Redirect if already authenticated
     if (isAuthenticated && user) {
-      // Org user should go to org dashboard
       if (user.actor === 'org') {
         router.push('/dashboards')
-      }
-      // Platform admin accidentally on this page? Send to platform dashboard
-      else if (user.actor === 'platform') {
+      } else if (user.actor === 'platform') {
         router.push('/dashboard')
       }
     }
@@ -68,19 +64,16 @@ const SignIn = () => {
       setLoading(true)
       setError(null)
 
-      const signInData: SignInRequest = {
-        email: data.email.trim(),
-        password: data.password,
-      }
-
-      const result = await signIn(signInData, false) // false = org user login
+      const result = await signIn(data, false) // false = org user
 
       if (!result.success) {
-        setError(result.error || 'Sign in failed. Please check your credentials and try again.')
+        setError(result.error || 'Sign in failed. Please check your credentials.')
       }
-      // Success case: signIn() in AuthContext will handle the redirect
+      // Success handled by context (auto-redirect)
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'An unexpected error occurred. Please try again.'
+      const errorMessage = err instanceof Error 
+        ? err.message 
+        : 'An unexpected error occurred. Please try again.'
       setError(errorMessage)
       console.error('Login error:', err)
     } finally {
@@ -120,10 +113,10 @@ const SignIn = () => {
                       <TextFormInput
                         control={control}
                         name="email"
-                        type="text"
-                        placeholder="Enter your email or username"
+                        type="email"
+                        placeholder="Enter your email"
                         className="form-control"
-                        label="Email or Username"
+                        label="Email"
                       />
                     </div>
                     <div className="mb-3">
@@ -153,7 +146,14 @@ const SignIn = () => {
                         type="submit"
                         disabled={loading}
                       >
-                        {loading ? 'Signing in...' : 'Sign In'}
+                        {loading ? (
+                          <>
+                            <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                            Signing in...
+                          </>
+                        ) : (
+                          'Sign In'
+                        )}
                       </button>
                     </div>
                   </form>

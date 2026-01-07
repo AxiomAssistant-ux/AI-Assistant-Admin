@@ -8,74 +8,7 @@ import type { DataTableColumn, DataTableFilterControl } from '@/components/table
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
-
-type SupportTicket = {
-  _id: string
-  org_id?: string | null
-  created_by_user_id: string
-  type: 'bug' | 'billing' | 'feature_request' | 'technical' | 'other'
-  priority: 'low' | 'medium' | 'high' | 'urgent'
-  subject: string
-  description: string
-  status: 'open' | 'in_progress' | 'waiting_on_user' | 'resolved' | 'closed'
-  attachments?: {
-    file_url: string
-    file_name: string
-  }[]
-  internal_notes?: {
-    note: string
-    added_by_user_id: string
-    created_at: string
-  }[]
-  created_at: string
-  updated_at: string
-  closed_at?: string | null
-}
-
-const MOCK_TICKETS: SupportTicket[] = [
-  {
-    _id: 'ticket_001',
-    org_id: 'org_001',
-    created_by_user_id: 'user_001',
-    type: 'technical',
-    priority: 'high',
-    subject: 'Unable to view call transcripts',
-    description: 'When I click on a call in the call logs, the transcript modal opens but shows a blank screen. This started happening yesterday.',
-    status: 'in_progress',
-    attachments: [],
-    created_at: '2024-12-18T10:30:00Z',
-    updated_at: '2024-12-18T14:20:00Z',
-    closed_at: null
-  },
-  {
-    _id: 'ticket_002',
-    org_id: 'org_001',
-    created_by_user_id: 'user_001',
-    type: 'billing',
-    priority: 'medium',
-    subject: 'Question about monthly charges',
-    description: 'I noticed my bill is higher this month. Can you help me understand what caused the increase?',
-    status: 'resolved',
-    attachments: [],
-    created_at: '2024-12-15T09:00:00Z',
-    updated_at: '2024-12-16T11:30:00Z',
-    closed_at: '2024-12-16T11:30:00Z'
-  },
-  {
-    _id: 'ticket_003',
-    org_id: 'org_001',
-    created_by_user_id: 'user_001',
-    type: 'feature_request',
-    priority: 'low',
-    subject: 'Add export to Excel feature',
-    description: 'It would be great if we could export call logs directly to Excel format instead of just CSV.',
-    status: 'open',
-    attachments: [],
-    created_at: '2024-12-17T14:00:00Z',
-    updated_at: '2024-12-17T14:00:00Z',
-    closed_at: null
-  }
-]
+import { supportApi, type SupportTicket, type SupportTicketsListParams, type CreateSupportTicketRequest } from '@/api/org/support'
 
 type TicketFormState = {
   type: SupportTicket['type']
@@ -94,9 +27,10 @@ const DEFAULT_FORM_STATE: TicketFormState = {
 const ContactSupportPage = () => {
   const { token, user, isAuthenticated } = useAuth()
 
-  const [tickets, setTickets] = useState<SupportTicket[]>(MOCK_TICKETS)
+  const [tickets, setTickets] = useState<SupportTicket[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -129,37 +63,32 @@ const ContactSupportPage = () => {
     setLoading(true)
     setError(null)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setTickets(MOCK_TICKETS)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load support tickets.')
+      const params: SupportTicketsListParams = {
+        skip: (currentPage - 1) * pageSize,
+        limit: pageSize,
+        sort: 'newest',
+      }
+
+      if (statusFilter !== 'all') params.status_filter = statusFilter as any
+      if (typeFilter !== 'all') params.type_filter = typeFilter as any
+
+      const response = await supportApi.list(params)
+      setTickets(response.tickets)
+      setTotal(response.total)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Unable to load support tickets.')
+      toast.error('Failed to load support tickets')
     } finally {
       setLoading(false)
     }
-  }, [token, isAuthenticated])
+  }, [token, isAuthenticated, currentPage, pageSize, statusFilter, typeFilter])
 
   useEffect(() => {
     fetchTickets()
   }, [fetchTickets])
 
-  const filteredTickets = useMemo(() => {
-    return tickets.filter((ticket) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        ticket.subject.toLowerCase().includes(debouncedSearch) ||
-        ticket.description.toLowerCase().includes(debouncedSearch)
-
-      const matchesStatus = statusFilter === 'all' || ticket.status === statusFilter
-      const matchesType = typeFilter === 'all' || ticket.type === typeFilter
-
-      return matchesSearch && matchesStatus && matchesType
-    })
-  }, [tickets, debouncedSearch, statusFilter, typeFilter])
-
-  const totalRecords = filteredTickets.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const startIndex = (currentPage - 1) * pageSize
-  const paginatedTickets = filteredTickets.slice(startIndex, startIndex + pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -202,30 +131,21 @@ const ContactSupportPage = () => {
 
     setSubmitting(true)
     try {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-
-      const newTicket: SupportTicket = {
-        _id: `ticket_${Date.now()}`,
-        org_id: user.org_id || null,
-        created_by_user_id: user.id,
+      const requestData: CreateSupportTicketRequest = {
         type: formState.type,
         priority: formState.priority,
         subject: formState.subject.trim(),
         description: formState.description.trim(),
-        status: 'open',
-        attachments: [],
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString(),
-        closed_at: null
       }
 
-      setTickets((prev) => [newTicket, ...prev])
+      await supportApi.create(requestData)
       toast.success('Support ticket created successfully')
       setCreateModalOpen(false)
       setFormState(DEFAULT_FORM_STATE)
       setFormErrors({})
-    } catch (err) {
-      toast.error(err instanceof Error ? err.message : 'Unable to create support ticket.')
+      fetchTickets()
+    } catch (err: any) {
+      toast.error(err?.response?.data?.detail || err?.message || 'Unable to create support ticket.')
     } finally {
       setSubmitting(false)
     }
@@ -334,7 +254,7 @@ const ContactSupportPage = () => {
           <div>
             <div className="fw-semibold">{ticket.subject}</div>
             <small className="text-muted d-block">
-              Ticket ID: {ticket._id}
+              Ticket ID: {ticket.id}
             </small>
           </div>
         )
@@ -502,8 +422,8 @@ const ContactSupportPage = () => {
             title="My Support Tickets"
             description="Track and manage your support requests."
             columns={columns}
-            data={paginatedTickets}
-            rowKey={(ticket) => ticket._id}
+            data={tickets}
+            rowKey={(ticket) => ticket.id}
             loading={loading}
             error={error}
             onRetry={fetchTickets}
@@ -531,13 +451,13 @@ const ContactSupportPage = () => {
             pagination={{
               currentPage,
               pageSize,
-              totalRecords,
+              totalRecords: total,
               totalPages,
               onPageChange: setCurrentPage,
               onPageSizeChange: setPageSize,
               pageSizeOptions: [10, 25, 50],
               startRecord: startIndex + 1,
-              endRecord: Math.min(startIndex + pageSize, totalRecords)
+              endRecord: Math.min(startIndex + pageSize, total)
             }}
             emptyState={{
               title: 'No support tickets',
@@ -630,7 +550,7 @@ const ContactSupportPage = () => {
               <Row className="g-3 mb-3">
                 <Col md={6}>
                   <label className="text-muted small">Ticket ID</label>
-                  <div className="fw-medium font-monospace small">{selectedTicket._id}</div>
+                  <div className="fw-medium font-monospace small">{selectedTicket.id}</div>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Status</label>

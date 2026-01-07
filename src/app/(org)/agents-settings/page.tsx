@@ -21,6 +21,7 @@ import type {
   LLMModelLiteral
 } from '@/types/admin-agent'
 import { toast } from 'react-toastify'
+import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 
 const matchesSearch = (agent: AdminAgent, term: string) => {
   const id = (agent.agent_id || agent.id || '').toLowerCase()
@@ -123,6 +124,7 @@ const initialEditFormState: EditFormState = {
 }
 
 const AgentsPage = () => {
+  useFeatureGuard()
   const { token, isAuthenticated, user, isLoading } = useAuth()
   const { voices, isLoading: voicesLoading, fetchVoices, getVoiceById } = useVoices()
   const [agents, setAgents] = useState<AdminAgent[]>([])

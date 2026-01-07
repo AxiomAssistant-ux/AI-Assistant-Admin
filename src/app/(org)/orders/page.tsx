@@ -8,151 +8,18 @@ import type { DataTableColumn, DataTableFilterControl } from '@/components/table
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
-
-type Order = {
-  _id: string
-  org_id: string
-  call_id?: string | null
-  customer_name: string
-  customer_phone: string
-  customer_email?: string | null
-  order_details: string
-  total_amount?: number | null
-  currency?: string
-  urgency: boolean
-  status: 'pending' | 'in_progress' | 'completed' | 'cancelled'
-  assigned_to_user_id?: string | null
-  assigned_role?: string | null
-  delivery_time?: string | null
-  special_instructions?: string | null
-  created_at: string
-  updated_at: string
-}
-
-const MOCK_ORDERS: Order[] = [
-  {
-    _id: 'order_001',
-    org_id: 'org_001',
-    call_id: 'call_abc123',
-    customer_name: 'John Doe',
-    customer_phone: '+1-555-0101',
-    customer_email: 'john.doe@email.com',
-    order_details: 'Large catering order for 50 people - vegetarian and non-vegetarian options',
-    total_amount: 850.00,
-    currency: 'USD',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: 'user_001',
-    assigned_role: 'chef',
-    delivery_time: '2024-12-25T14:00:00Z',
-    special_instructions: 'Please arrange for disposable plates and cutlery',
-    created_at: '2024-12-18T09:30:00Z',
-    updated_at: '2024-12-18T10:15:00Z'
-  },
-  {
-    _id: 'order_002',
-    org_id: 'org_002',
-    call_id: 'call_def456',
-    customer_name: 'Sarah Johnson',
-    customer_phone: '+1-555-0102',
-    customer_email: 'sarah.j@email.com',
-    order_details: 'Birthday cake - chocolate with custom message',
-    total_amount: 75.00,
-    currency: 'USD',
-    urgency: false,
-    status: 'pending',
-    assigned_to_user_id: 'user_002',
-    assigned_role: 'pastry chef',
-    delivery_time: '2024-12-24T16:00:00Z',
-    special_instructions: 'Message: Happy Birthday Sarah!',
-    created_at: '2024-12-17T11:15:00Z',
-    updated_at: '2024-12-17T11:15:00Z'
-  },
-  {
-    _id: 'order_003',
-    org_id: 'org_001',
-    call_id: null,
-    customer_name: 'Michael Chen',
-    customer_phone: '+1-555-0103',
-    customer_email: null,
-    order_details: 'Weekly meal prep - 5 days lunch and dinner',
-    total_amount: 350.00,
-    currency: 'USD',
-    urgency: false,
-    status: 'completed',
-    assigned_to_user_id: 'user_003',
-    assigned_role: 'kitchen staff',
-    delivery_time: '2024-12-19T18:00:00Z',
-    special_instructions: null,
-    created_at: '2024-12-16T14:30:00Z',
-    updated_at: '2024-12-19T18:30:00Z'
-  },
-  {
-    _id: 'order_004',
-    org_id: 'org_003',
-    call_id: 'call_ghi789',
-    customer_name: 'Emma Rodriguez',
-    customer_phone: '+1-555-0104',
-    customer_email: 'emma.r@email.com',
-    order_details: 'Wedding reception catering for 150 guests',
-    total_amount: 4500.00,
-    currency: 'USD',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: null,
-    assigned_role: 'catering manager',
-    delivery_time: '2024-12-28T17:00:00Z',
-    special_instructions: 'Venue: Grand Ballroom, Setup required 2 hours before',
-    created_at: '2024-12-18T15:20:00Z',
-    updated_at: '2024-12-18T15:45:00Z'
-  },
-  {
-    _id: 'order_005',
-    org_id: 'org_001',
-    call_id: 'call_jkl012',
-    customer_name: 'David Wilson',
-    customer_phone: '+1-555-0105',
-    customer_email: 'david.wilson@email.com',
-    order_details: 'Family dinner takeout - 2 pizzas and salads',
-    total_amount: 65.00,
-    currency: 'USD',
-    urgency: false,
-    status: 'cancelled',
-    assigned_to_user_id: 'user_001',
-    assigned_role: 'counter staff',
-    delivery_time: null,
-    special_instructions: null,
-    created_at: '2024-12-17T10:00:00Z',
-    updated_at: '2024-12-17T11:30:00Z'
-  },
-  {
-    _id: 'order_006',
-    org_id: 'org_002',
-    call_id: null,
-    customer_name: 'Lisa Thompson',
-    customer_phone: '+1-555-0106',
-    customer_email: 'lisa.t@email.com',
-    order_details: 'Corporate breakfast meeting - bagels, coffee, fruit',
-    total_amount: 250.00,
-    currency: 'USD',
-    urgency: true,
-    status: 'pending',
-    assigned_to_user_id: 'user_004',
-    assigned_role: 'morning shift',
-    delivery_time: '2024-12-23T08:00:00Z',
-    special_instructions: 'Deliver to conference room B on 3rd floor',
-    created_at: '2024-12-22T16:00:00Z',
-    updated_at: '2024-12-22T16:00:00Z'
-  }
-]
+import { ordersApi, type Order, type OrdersListParams } from '@/api/org/orders'
+import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 
 const OrdersPage = () => {
+  useFeatureGuard()
   const { token, user, isAuthenticated } = useAuth()
   const isAdmin = Boolean(isAuthenticated && user?.role === 'admin')
 
-  const [orders, setOrders] = useState<Order[]>(MOCK_ORDERS)
+  const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -187,42 +54,33 @@ const OrdersPage = () => {
     setLoading(true)
     setError(null)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setOrders(MOCK_ORDERS)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load orders.')
+      const params: OrdersListParams = {
+        skip: (currentPage - 1) * pageSize,
+        limit: pageSize,
+        sort: 'newest',
+      }
+
+      if (statusFilter !== 'all') params.status_filter = statusFilter as any
+      if (urgencyFilter === 'urgent') params.urgency_filter = true
+      else if (urgencyFilter === 'normal') params.urgency_filter = false
+
+      const response = await ordersApi.list(params)
+      setOrders(response.orders)
+      setTotal(response.total)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Unable to load orders.')
+      toast.error('Failed to load orders')
     } finally {
       setLoading(false)
     }
-  }, [token, isAuthenticated])
+  }, [token, isAuthenticated, currentPage, pageSize, statusFilter, urgencyFilter])
 
   useEffect(() => {
     fetchOrders()
   }, [fetchOrders])
 
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        order.customer_name.toLowerCase().includes(debouncedSearch) ||
-        order.customer_phone.toLowerCase().includes(debouncedSearch) ||
-        (order.customer_email ?? '').toLowerCase().includes(debouncedSearch) ||
-        order.order_details.toLowerCase().includes(debouncedSearch)
-
-      const matchesStatus = statusFilter === 'all' || order.status === statusFilter
-      const matchesUrgency = 
-        urgencyFilter === 'all' || 
-        (urgencyFilter === 'urgent' && order.urgency) ||
-        (urgencyFilter === 'normal' && !order.urgency)
-
-      return matchesSearch && matchesStatus && matchesUrgency
-    })
-  }, [orders, debouncedSearch, statusFilter, urgencyFilter])
-
-  const totalRecords = filteredOrders.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const startIndex = (currentPage - 1) * pageSize
-  const paginatedOrders = filteredOrders.slice(startIndex, startIndex + pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -241,13 +99,13 @@ const OrdersPage = () => {
 
     setUpdatingField({ orderId, field: 'status' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await ordersApi.update(orderId, { status: newStatus })
       
       setOrders(prev => prev.map(order =>
-        order._id === orderId ? { ...order, status: newStatus, updated_at: new Date().toISOString() } : order
+        order.id === orderId ? { ...order, status: newStatus, updated_at: new Date().toISOString() } : order
       ))
       
-      if (selectedOrder && selectedOrder._id === orderId) {
+      if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, status: newStatus, updated_at: new Date().toISOString() })
       }
       
@@ -262,13 +120,13 @@ const OrdersPage = () => {
   const handleUrgencyToggle = async (orderId: string, currentUrgency: boolean) => {
     setUpdatingField({ orderId, field: 'urgency' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await ordersApi.update(orderId, { urgency: !currentUrgency })
       
       setOrders(prev => prev.map(order =>
-        order._id === orderId ? { ...order, urgency: !currentUrgency, updated_at: new Date().toISOString() } : order
+        order.id === orderId ? { ...order, urgency: !currentUrgency, updated_at: new Date().toISOString() } : order
       ))
       
-      if (selectedOrder && selectedOrder._id === orderId) {
+      if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, urgency: !currentUrgency, updated_at: new Date().toISOString() })
       }
       
@@ -288,15 +146,14 @@ const OrdersPage = () => {
 
     setUpdatingField({ orderId, field: 'delivery_time' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
       const newDelivery = new Date(deliveryValue).toISOString()
+      await ordersApi.update(orderId, { delivery_time: newDelivery })
       
       setOrders(prev => prev.map(order =>
-        order._id === orderId ? { ...order, delivery_time: newDelivery, updated_at: new Date().toISOString() } : order
+        order.id === orderId ? { ...order, delivery_time: newDelivery, updated_at: new Date().toISOString() } : order
       ))
       
-      if (selectedOrder && selectedOrder._id === orderId) {
+      if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, delivery_time: newDelivery, updated_at: new Date().toISOString() })
       }
       
@@ -317,13 +174,13 @@ const OrdersPage = () => {
 
     setUpdatingField({ orderId, field: 'assigned_role' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await ordersApi.update(orderId, { assigned_role: roleValue.trim() })
       
       setOrders(prev => prev.map(order =>
-        order._id === orderId ? { ...order, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : order
+        order.id === orderId ? { ...order, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : order
       ))
       
-      if (selectedOrder && selectedOrder._id === orderId) {
+      if (selectedOrder && selectedOrder.id === orderId) {
         setSelectedOrder({ ...selectedOrder, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() })
       }
       
@@ -417,7 +274,6 @@ const OrdersPage = () => {
         key: 'serial',
         header: '#',
         width: 60,
-        // render: (_, index) => <span className="text-muted">{startIndex + index + 1}</span>        
         render: (_, { rowIndex }) => <span className="text-muted">{startIndex + rowIndex + 1}</span>
       },
       {
@@ -455,19 +311,19 @@ const OrdersPage = () => {
         width: 110,
         render: (order) => (
           <div
-            onClick={() => updatingField?.orderId !== order._id && handleUrgencyToggle(order._id, order.urgency)}
-            style={{ cursor: updatingField?.orderId === order._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.orderId !== order.id && handleUrgencyToggle(order.id, order.urgency)}
+            style={{ cursor: updatingField?.orderId === order.id ? 'not-allowed' : 'pointer' }}
             title="Click to toggle urgency"
           >
             <Badge
               bg={order.urgency ? 'danger' : 'secondary'}
               className="d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.orderId === order._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.orderId === order.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.orderId === order._id && updatingField.field === 'urgency' ? (
+              {updatingField?.orderId === order.id && updatingField.field === 'urgency' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   <span className="small">...</span>
@@ -488,19 +344,19 @@ const OrdersPage = () => {
         width: 150,
         render: (order) => (
           <div
-            onClick={() => updatingField?.orderId !== order._id && handleStatusToggle(order._id, order.status)}
-            style={{ cursor: updatingField?.orderId === order._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.orderId !== order.id && handleStatusToggle(order.id, order.status)}
+            style={{ cursor: updatingField?.orderId === order.id ? 'not-allowed' : 'pointer' }}
             title="Click to cycle status"
           >
             <Badge
               bg={getStatusVariant(order.status)}
               className="text-capitalize d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.orderId === order._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.orderId === order.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.orderId === order._id && updatingField.field === 'status' ? (
+              {updatingField?.orderId === order.id && updatingField.field === 'status' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   Updating...
@@ -584,8 +440,8 @@ const OrdersPage = () => {
             title="All Orders"
             description="Manage customer orders received through calls or online."
             columns={columns}
-            data={paginatedOrders}
-            rowKey={(order) => order._id}
+            data={orders}
+            rowKey={(order) => order.id}
             loading={loading}
             error={error}
             onRetry={fetchOrders}
@@ -603,13 +459,13 @@ const OrdersPage = () => {
             pagination={{
               currentPage,
               pageSize,
-              totalRecords,
+              totalRecords: total,
               totalPages,
               onPageChange: setCurrentPage,
               onPageSizeChange: setPageSize,
               pageSizeOptions: [10, 25, 50],
               startRecord: startIndex + 1,
-              endRecord: Math.min(startIndex + pageSize, totalRecords)
+              endRecord: Math.min(startIndex + pageSize, total)
             }}
             emptyState={{
               title: 'No orders found',
@@ -630,7 +486,7 @@ const OrdersPage = () => {
               <Row className="g-3 mb-3">
                 <Col md={6}>
                   <label className="text-muted small">Order ID</label>
-                  <div className="fw-medium font-monospace small">{selectedOrder._id}</div>
+                  <div className="fw-medium font-monospace small">{selectedOrder.id}</div>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Call ID</label>
@@ -640,7 +496,7 @@ const OrdersPage = () => {
                   <label className="text-muted small">Urgency</label>
                   <div>
                     <div
-                      onClick={() => handleUrgencyToggle(selectedOrder._id, selectedOrder.urgency)}
+                      onClick={() => handleUrgencyToggle(selectedOrder.id, selectedOrder.urgency)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to toggle"
                     >
@@ -649,7 +505,7 @@ const OrdersPage = () => {
                         className="d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.orderId === selectedOrder._id && updatingField.field === 'urgency' ? (
+                        {updatingField?.orderId === selectedOrder.id && updatingField.field === 'urgency' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             <span className="small">Updating...</span>
@@ -668,7 +524,7 @@ const OrdersPage = () => {
                   <label className="text-muted small">Status</label>
                   <div>
                     <div
-                      onClick={() => handleStatusToggle(selectedOrder._id, selectedOrder.status)}
+                      onClick={() => handleStatusToggle(selectedOrder.id, selectedOrder.status)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to cycle status"
                     >
@@ -677,7 +533,7 @@ const OrdersPage = () => {
                         className="text-capitalize d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.orderId === selectedOrder._id && updatingField.field === 'status' ? (
+                        {updatingField?.orderId === selectedOrder.id && updatingField.field === 'status' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             Updating...
@@ -701,7 +557,7 @@ const OrdersPage = () => {
                         variant="link"
                         className="p-0 text-decoration-none"
                         onClick={() => {
-                          setEditingRole(selectedOrder._id)
+                          setEditingRole(selectedOrder.id)
                           setRoleValue(selectedOrder.assigned_role || '')
                         }}
                       >
@@ -709,7 +565,7 @@ const OrdersPage = () => {
                       </Button>
                     )}
                   </label>
-                  {editingRole === selectedOrder._id ? (
+                  {editingRole === selectedOrder.id ? (
                     <div className="d-flex gap-2">
                       <Form.Control
                         size="sm"
@@ -721,10 +577,10 @@ const OrdersPage = () => {
                       <Button
                         size="sm"
                         variant="success"
-                        onClick={() => handleRoleSave(selectedOrder._id)}
-                        disabled={updatingField?.orderId === selectedOrder._id}
+                        onClick={() => handleRoleSave(selectedOrder.id)}
+                        disabled={updatingField?.orderId === selectedOrder.id}
                       >
-                        {updatingField?.orderId === selectedOrder._id && updatingField.field === 'assigned_role' ? (
+                        {updatingField?.orderId === selectedOrder.id && updatingField.field === 'assigned_role' ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
                           <IconifyIcon icon="solar:check-circle-linear" width={16} height={16} />
@@ -751,7 +607,7 @@ const OrdersPage = () => {
                         variant="link"
                         className="p-0 text-decoration-none"
                         onClick={() => {
-                          setEditingDelivery(selectedOrder._id)
+                          setEditingDelivery(selectedOrder.id)
                           setDeliveryValue(formatDateInput(selectedOrder.delivery_time))
                         }}
                       >
@@ -759,7 +615,7 @@ const OrdersPage = () => {
                       </Button>
                     )}
                   </label>
-                  {editingDelivery === selectedOrder._id ? (
+                  {editingDelivery === selectedOrder.id ? (
                     <div className="d-flex gap-2">
                       <Form.Control
                         type="datetime-local"
@@ -771,10 +627,10 @@ const OrdersPage = () => {
                       <Button
                         size="sm"
                         variant="success"
-                        onClick={() => handleDeliverySave(selectedOrder._id)}
-                        disabled={updatingField?.orderId === selectedOrder._id}
+                        onClick={() => handleDeliverySave(selectedOrder.id)}
+                        disabled={updatingField?.orderId === selectedOrder.id}
                       >
-                        {updatingField?.orderId === selectedOrder._id && updatingField.field === 'delivery_time' ? (
+                        {updatingField?.orderId === selectedOrder.id && updatingField.field === 'delivery_time' ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
                           <IconifyIcon icon="solar:check-circle-linear" width={16} height={16} />

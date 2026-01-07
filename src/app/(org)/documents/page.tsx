@@ -13,6 +13,8 @@ import { adminAgentApi } from '@/lib/admin-agent-api'
 import type { KnowledgeBaseDependentAgent, KnowledgeBaseDocument } from '@/types/knowledge-base'
 import type { AdminAgent } from '@/types/admin-agent'
 
+import { useFeatureGuard } from '@/hooks/useFeatureGuard'
+
 const formatDate = (value?: string) => {
   if (!value) return '—'
   try {
@@ -42,6 +44,7 @@ const getStatusVariant = (status?: string) => {
 const DEFAULT_PAGE_SIZE = 10
 
 const DocumentsPage = () => {
+  useFeatureGuard()
   const { token, user, isAuthenticated, isLoading } = useAuth()
 
   const [documents, setDocuments] = useState<KnowledgeBaseDocument[]>([])

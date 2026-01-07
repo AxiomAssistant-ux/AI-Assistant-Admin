@@ -1,109 +1,26 @@
 'use client'
 
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge, Button, Col, Form, Modal, Row } from 'react-bootstrap'
+import React, { use, useCallback, useEffect, useMemo, useState } from 'react'
+import { Badge, Button, Col, Form, Modal, Row, Spinner} from 'react-bootstrap'
 import Link from 'next/link'
 import { DataTable } from '@/components/table'
 import type { DataTableColumn, DataTableFilterControl } from '@/components/table'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
+import { appointmentsApi, type Appointment } from '@/api/org/appointments'
 
-type Appointment = {
-  _id: string
-  org_id: string
-  call_id?: string | null
-  customer_name: string
-  customer_phone: string
-  customer_email?: string | null
-  scheduled_at: string
-  status: 'scheduled' | 'completed' | 'cancelled'
-  created_at: string
-  updated_at: string
-}
-
-const MOCK_APPOINTMENTS: Appointment[] = [
-  {
-    _id: 'appt_001',
-    org_id: 'org_001',
-    call_id: 'call_abc123',
-    customer_name: 'John Doe',
-    customer_phone: '+1-555-0101',
-    customer_email: 'john.doe@email.com',
-    scheduled_at: '2024-12-25T10:00:00Z',
-    status: 'scheduled',
-    created_at: '2024-12-18T09:30:00Z',
-    updated_at: '2024-12-18T09:30:00Z'
-  },
-  {
-    _id: 'appt_002',
-    org_id: 'org_001',
-    call_id: 'call_def456',
-    customer_name: 'Sarah Johnson',
-    customer_phone: '+1-555-0102',
-    customer_email: 'sarah.j@email.com',
-    scheduled_at: '2024-12-24T14:30:00Z',
-    status: 'scheduled',
-    created_at: '2024-12-17T11:15:00Z',
-    updated_at: '2024-12-18T08:20:00Z'
-  },
-  {
-    _id: 'appt_003',
-    org_id: 'org_001',
-    call_id: null,
-    customer_name: 'Michael Chen',
-    customer_phone: '+1-555-0103',
-    customer_email: null,
-    scheduled_at: '2024-12-19T16:00:00Z',
-    status: 'completed',
-    created_at: '2024-12-16T14:30:00Z',
-    updated_at: '2024-12-19T16:45:00Z'
-  },
-  {
-    _id: 'appt_004',
-    org_id: 'org_002',
-    call_id: 'call_ghi789',
-    customer_name: 'Emma Rodriguez',
-    customer_phone: '+1-555-0104',
-    customer_email: 'emma.r@email.com',
-    scheduled_at: '2024-12-20T09:00:00Z',
-    status: 'cancelled',
-    created_at: '2024-12-18T15:20:00Z',
-    updated_at: '2024-12-19T10:00:00Z'
-  },
-  {
-    _id: 'appt_005',
-    org_id: 'org_001',
-    call_id: 'call_jkl012',
-    customer_name: 'David Wilson',
-    customer_phone: '+1-555-0105',
-    customer_email: 'david.wilson@email.com',
-    scheduled_at: '2024-12-26T11:00:00Z',
-    status: 'scheduled',
-    created_at: '2024-12-15T10:00:00Z',
-    updated_at: '2024-12-15T10:00:00Z'
-  },
-  {
-    _id: 'appt_006',
-    org_id: 'org_001',
-    call_id: 'call_mno345',
-    customer_name: 'Lisa Thompson',
-    customer_phone: '+1-555-0106',
-    customer_email: 'lisa.t@email.com',
-    scheduled_at: '2024-12-23T15:30:00Z',
-    status: 'completed',
-    created_at: '2024-12-14T09:00:00Z',
-    updated_at: '2024-12-23T16:00:00Z'
-  }
-]
+import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 
 const AppointmentsPage = () => {
+  useFeatureGuard()
   const { token, user, isAuthenticated } = useAuth()
   const isAdmin = Boolean(isAuthenticated && user?.role === 'admin')
 
-  const [appointments, setAppointments] = useState<Appointment[]>(MOCK_APPOINTMENTS)
+  const [appointments, setAppointments] = useState<Appointment[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -134,40 +51,53 @@ const AppointmentsPage = () => {
     setLoading(true)
     setError(null)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setAppointments(MOCK_APPOINTMENTS)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load appointments.')
+      const params = {
+        skip: (currentPage - 1) * pageSize,
+        limit: pageSize,
+        sort: 'newest' as const,
+      }
+
+      if (statusFilter !== 'all') {
+        params.status_filter = statusFilter as any
+      }
+
+      const response = await appointmentsApi.list(params)
+      setAppointments(response.appointments)
+      setTotal(response.total)
+    } catch (err: any) {
+      const errorMessage = err?.response?.data?.detail || err?.message || 'Unable to load appointments.'
+      setError(errorMessage)
+      toast.error('Failed to load appointments')
     } finally {
       setLoading(false)
     }
-  }, [token, isAuthenticated])
+  }, [token, isAuthenticated, currentPage, pageSize, statusFilter])
 
   useEffect(() => {
     fetchAppointments()
   }, [fetchAppointments])
 
+  // Client-side search filtering (since backend doesn't have search param)
   const filteredAppointments = useMemo(() => {
+    if (!debouncedSearch) return appointments
+
     return appointments.filter((appt) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        appt.customer_name.toLowerCase().includes(debouncedSearch) ||
-        appt.customer_phone.toLowerCase().includes(debouncedSearch) ||
-        (appt.customer_email ?? '').toLowerCase().includes(debouncedSearch)
-
-      const matchesStatus = statusFilter === 'all' || appt.status === statusFilter
-
-      return matchesSearch && matchesStatus
+      const searchLower = debouncedSearch.toLowerCase()
+      return (
+        appt.customer_name.toLowerCase().includes(searchLower) ||
+        appt.customer_phone.toLowerCase().includes(searchLower) ||
+        (appt.customer_email ?? '').toLowerCase().includes(searchLower)
+      )
     })
-  }, [appointments, debouncedSearch, statusFilter])
+  }, [appointments, debouncedSearch])
 
-  const totalRecords = filteredAppointments.length
+  const totalRecords = debouncedSearch ? filteredAppointments.length : total
   const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
-  const startIndex = (currentPage - 1) * pageSize
-  const paginatedAppointments = filteredAppointments.slice(startIndex, startIndex + pageSize)
+  const startIndex = debouncedSearch ? 0 : (currentPage - 1) * pageSize
+  const displayAppointments = debouncedSearch ? filteredAppointments : appointments
 
   useEffect(() => {
-    if (currentPage > totalPages) {
+    if (currentPage > totalPages && totalPages > 0) {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
@@ -182,13 +112,13 @@ const AppointmentsPage = () => {
 
     setUpdatingField({ apptId, field: 'status' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await appointmentsApi.update(apptId, { status: newStatus })
       
       setAppointments(prev => prev.map(appt =>
-        appt._id === apptId ? { ...appt, status: newStatus, updated_at: new Date().toISOString() } : appt
+        appt.id === apptId ? { ...appt, status: newStatus, updated_at: new Date().toISOString() } : appt
       ))
       
-      if (selectedAppointment && selectedAppointment._id === apptId) {
+      if (selectedAppointment && selectedAppointment.id === apptId) {
         setSelectedAppointment({ ...selectedAppointment, status: newStatus, updated_at: new Date().toISOString() })
       }
       
@@ -208,15 +138,14 @@ const AppointmentsPage = () => {
 
     setUpdatingField({ apptId, field: 'scheduled_at' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
       const newSchedule = new Date(scheduleValue).toISOString()
+      await appointmentsApi.update(apptId, { scheduled_at: newSchedule })
       
       setAppointments(prev => prev.map(appt =>
-        appt._id === apptId ? { ...appt, scheduled_at: newSchedule, updated_at: new Date().toISOString() } : appt
+        appt.id === apptId ? { ...appt, scheduled_at: newSchedule, updated_at: new Date().toISOString() } : appt
       ))
       
-      if (selectedAppointment && selectedAppointment._id === apptId) {
+      if (selectedAppointment && selectedAppointment.id === apptId) {
         setSelectedAppointment({ ...selectedAppointment, scheduled_at: newSchedule, updated_at: new Date().toISOString() })
       }
       
@@ -312,19 +241,19 @@ const AppointmentsPage = () => {
         width: 150,
         render: (appt) => (
           <div
-            onClick={() => updatingField?.apptId !== appt._id && handleStatusToggle(appt._id, appt.status)}
-            style={{ cursor: updatingField?.apptId === appt._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.apptId !== appt.id && handleStatusToggle(appt.id, appt.status)}
+            style={{ cursor: updatingField?.apptId === appt.id ? 'not-allowed' : 'pointer' }}
             title="Click to cycle status"
           >
             <Badge
               bg={getStatusVariant(appt.status)}
               className="text-capitalize d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.apptId === appt._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.apptId === appt.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.apptId === appt._id && updatingField.field === 'status' ? (
+              {updatingField?.apptId === appt.id && updatingField.field === 'status' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   Updating...
@@ -402,8 +331,8 @@ const AppointmentsPage = () => {
             title="All Appointments"
             description="Manage customer appointments scheduled through calls or manually."
             columns={columns}
-            data={paginatedAppointments}
-            rowKey={(appt) => appt._id}
+            data={displayAppointments}
+            rowKey={(appt) => appt.id}
             loading={loading}
             error={error}
             onRetry={fetchAppointments}
@@ -448,7 +377,7 @@ const AppointmentsPage = () => {
               <Row className="g-3 mb-3">
                 <Col md={6}>
                   <label className="text-muted small">Appointment ID</label>
-                  <div className="fw-medium font-monospace small">{selectedAppointment._id}</div>
+                  <div className="fw-medium font-monospace small">{selectedAppointment.id}</div>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Call ID</label>
@@ -458,7 +387,7 @@ const AppointmentsPage = () => {
                   <label className="text-muted small">Status</label>
                   <div>
                     <div
-                      onClick={() => handleStatusToggle(selectedAppointment._id, selectedAppointment.status)}
+                      onClick={() => handleStatusToggle(selectedAppointment.id, selectedAppointment.status)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to cycle status"
                     >
@@ -467,7 +396,7 @@ const AppointmentsPage = () => {
                         className="text-capitalize d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.apptId === selectedAppointment._id && updatingField.field === 'status' ? (
+                        {updatingField?.apptId === selectedAppointment.id && updatingField.field === 'status' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             Updating...
@@ -491,7 +420,7 @@ const AppointmentsPage = () => {
                         variant="link"
                         className="p-0 text-decoration-none"
                         onClick={() => {
-                          setEditingSchedule(selectedAppointment._id)
+                          setEditingSchedule(selectedAppointment.id)
                           setScheduleValue(formatDateInput(selectedAppointment.scheduled_at))
                         }}
                       >
@@ -499,7 +428,7 @@ const AppointmentsPage = () => {
                       </Button>
                     )}
                   </label>
-                  {editingSchedule === selectedAppointment._id ? (
+                  {editingSchedule === selectedAppointment.id ? (
                     <div className="d-flex gap-2">
                       <Form.Control
                         type="datetime-local"
@@ -511,10 +440,10 @@ const AppointmentsPage = () => {
                       <Button
                         size="sm"
                         variant="success"
-                        onClick={() => handleScheduleSave(selectedAppointment._id)}
-                        disabled={updatingField?.apptId === selectedAppointment._id}
+                        onClick={() => handleScheduleSave(selectedAppointment.id)}
+                        disabled={updatingField?.apptId === selectedAppointment.id}
                       >
-                        {updatingField?.apptId === selectedAppointment._id && updatingField.field === 'scheduled_at' ? (
+                        {updatingField?.apptId === selectedAppointment.id && updatingField.field === 'scheduled_at' ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
                           <IconifyIcon icon="solar:check-circle-linear" width={16} height={16} />

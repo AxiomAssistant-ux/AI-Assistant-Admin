@@ -29,7 +29,7 @@ const LayoutProvider = ({ children }: ChildrenType) => {
     topbarTheme: queryParams['topbar_theme'] ? (queryParams['topbar_theme'] as ThemeType) : 'light',
     menu: {
       theme: queryParams['menu_theme'] ? (queryParams['menu_theme'] as MenuType['theme']) : 'light',
-      size: queryParams['menu_size'] ? (queryParams['menu_size'] as MenuType['size']) : 'default',
+      size: 'default',
     },
   }
 
@@ -60,7 +60,7 @@ const LayoutProvider = ({ children }: ChildrenType) => {
 
   // change menu theme
   const changeMenuSize = (newSize: MenuType['size']) => {
-    updateSettings({ menu: { ...settings.menu, size: newSize } })
+    // Does nothing now
   }
 
   // toggle theme customizer offcanvas

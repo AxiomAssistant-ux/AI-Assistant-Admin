@@ -1,6 +1,7 @@
 import LeftSideBarToggle from './components/LeftSideBarToggle'
 import ProfileDropdown from './components/ProfileDropdown'
 import ThemeModeToggle from './components/ThemeModeToggle'
+import ActiveCallsBadge from './components/ActiveCallsBadge'
 import { Container } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import Notifications from './components/Notifications'
@@ -21,6 +22,7 @@ const page = () => {
               </form>
             </div>
             <div className="d-flex align-items-center gap-2">
+              <ActiveCallsBadge />
               <ThemeModeToggle />
               <Notifications />
               <ProfileDropdown />

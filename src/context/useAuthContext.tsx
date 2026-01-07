@@ -1,30 +1,114 @@
-// src/context/useAuthContext.tsx
+/**
+ * Auth Context
+ * Manages authentication state for both org and platform users
+ * 
+ * FIXED: Ensures token is saved before making authenticated requests
+ */
+
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { authApi } from '@/lib/auth-api'
-import { authStorage } from '@/lib/auth-storage'
+import { authApi } from '@/api/auth'
 import type {
   UserOut,
   SignInRequest,
-  SignUpRequest,
-  SignupOTPRequestOut,
-  TokenOut,
+  OrgUserResponse,
+  ActorType,
 } from '@/types/auth'
+
+// ===============================
+// Auth Storage Helper
+// ===============================
+
+const AUTH_STORAGE = {
+  getToken: (): string | null => {
+    if (typeof window === 'undefined') return null
+    return localStorage.getItem('access_token')
+  },
+  
+  getUser: (): UserOut | null => {
+    if (typeof window === 'undefined') return null
+    const userStr = localStorage.getItem('user')
+    return userStr ? JSON.parse(userStr) : null
+  },
+  
+  getTokenExpiry: (): number | null => {
+    if (typeof window === 'undefined') return null
+    const expiry = localStorage.getItem('token_expires_at')
+    return expiry ? parseInt(expiry) : null
+  },
+  
+  saveAuth: (token: string, user: UserOut, expiresIn: number) => {
+    if (typeof window === 'undefined') return
+    
+    localStorage.setItem('access_token', token)
+    localStorage.setItem('user', JSON.stringify(user))
+    
+    // Calculate expiry timestamp
+    const expiryTimestamp = Date.now() + (expiresIn * 1000)
+    localStorage.setItem('token_expires_at', expiryTimestamp.toString())
+  },
+  
+  // NEW: Save just the token immediately
+  saveToken: (token: string) => {
+    if (typeof window === 'undefined') return
+    localStorage.setItem('access_token', token)
+  },
+  
+  clearAuth: () => {
+    if (typeof window === 'undefined') return
+    
+    localStorage.removeItem('access_token')
+    localStorage.removeItem('user')
+    localStorage.removeItem('token_expires_at')
+  },
+  
+  isTokenExpired: (): boolean => {
+    const expiry = AUTH_STORAGE.getTokenExpiry()
+    if (!expiry) return true
+    return Date.now() > expiry
+  },
+}
+
+// ===============================
+// Transform Backend Response to UserOut
+// ===============================
+
+function transformOrgUserResponse(response: OrgUserResponse): UserOut {
+  return {
+    actor: 'org',
+    id: response.org_user._id,
+    email: response.org_user.email,
+    name: response.org_user.name,
+    org_id: response.org_user.org_id,
+    is_admin: response.org_user.is_admin,
+    role_name: response.org_user.role_name,
+    status: response.org_user.status,
+    features: response.org_user.features,
+    organization: response.organization,
+  }
+}
+
+// ===============================
+// Auth Context Type
+// ===============================
 
 interface AuthContextType {
   user: UserOut | null
   token: string | null
   isLoading: boolean
   isAuthenticated: boolean
-  signIn: (data: SignInRequest, isAdmin?: boolean) => Promise<{ success: boolean; error?: string }>
-  signUp: (data: SignUpRequest, isAdmin?: boolean) => Promise<{ success: boolean; error?: string; data?: SignupOTPRequestOut }>
+  signIn: (data: SignInRequest, isPlatform?: boolean) => Promise<{ success: boolean; error?: string }>
   signOut: () => void
   refreshUser: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
+
+// ===============================
+// Auth Provider
+// ===============================
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<UserOut | null>(null)
@@ -33,18 +117,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const router = useRouter()
 
   // ===============================
-  // Init from storage
+  // Initialize from storage
   // ===============================
   useEffect(() => {
     const initAuth = () => {
-      const storedToken = authStorage.getToken()
-      const storedUser = authStorage.getUser()
+      const storedToken = AUTH_STORAGE.getToken()
+      const storedUser = AUTH_STORAGE.getUser()
 
-      if (storedToken && storedUser && !authStorage.isTokenExpired()) {
+      if (storedToken && storedUser && !AUTH_STORAGE.isTokenExpired()) {
         setToken(storedToken)
         setUser(storedUser)
       } else {
-        authStorage.clearAuth()
+        AUTH_STORAGE.clearAuth()
       }
 
       setIsLoading(false)
@@ -54,88 +138,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ===============================
-  // Sign In
+  // Sign In - FIXED VERSION
   // ===============================
   const signIn = async (
     data: SignInRequest,
-    isAdmin: boolean = false
+    isPlatform: boolean = false
   ): Promise<{ success: boolean; error?: string }> => {
     try {
       setIsLoading(true)
 
-      const response = isAdmin
-        ? await authApi.adminSignIn(data)
-        : await authApi.userSignIn(data)
-
-      if (response.error || !response.data) {
-        return { success: false, error: response.error || 'Sign in failed' }
+      // For now, only support org sign in
+      if (isPlatform) {
+        return { 
+          success: false, 
+          error: 'Platform admin sign in not yet implemented. Please use org sign in.' 
+        }
       }
 
-      const tokenData = response.data as TokenOut
+      // Step 1: Sign in and get token
+      const signInResponse = await authApi.orgSignIn(data)
       
-      // Platform admins get 'platform', org users get 'org'
-      const actor: 'platform' | 'org' = isAdmin ? 'platform' : 'org'
-
-      const userWithActor: UserOut = {
-        ...tokenData.user,
-        actor,
-      }
-
-      authStorage.saveAuth({
-        ...tokenData,
-        user: userWithActor,
-      })
-
-      setToken(tokenData.access_token)
-      setUser(userWithActor)
-
-      const redirectPath = actor === 'platform' ? '/dashboard' : '/dashboards'
+      // Step 2: IMMEDIATELY save token to localStorage BEFORE making next request
+      // This ensures the axios interceptor can read it
+      AUTH_STORAGE.saveToken(signInResponse.access_token)
       
-      console.log('🔐 SignIn Success:', {
-        isAdmin,
-        actor,
+      console.log('✅ Token saved to localStorage:', signInResponse.access_token.substring(0, 20) + '...')
+      
+      // Step 3: Now get current user data (token will be in headers via interceptor)
+      const userResponse = await authApi.getCurrentOrgUser()
+      
+      // Step 4: Transform to UserOut
+      const userOut = transformOrgUserResponse(userResponse)
+      
+      // Step 5: Save complete auth data to storage
+      AUTH_STORAGE.saveAuth(
+        signInResponse.access_token,
+        userOut,
+        signInResponse.expires_in
+      )
+      
+      // Step 6: Update state
+      setToken(signInResponse.access_token)
+      setUser(userOut)
+
+      // Step 7: Redirect to dashboard
+      const redirectPath = '/dashboards'
+      
+      console.log('✅ Sign In Success:', {
+        actor: userOut.actor,
+        user: userOut.name,
+        org: userOut.organization.company_name,
         redirectPath,
-        user: userWithActor
       })
 
-      // Route correctly based on actor
       router.push(redirectPath)
 
       return { success: true }
-    } catch (error) {
-      console.error('Sign in error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'An error occurred' }
-    } finally {
-      setIsLoading(false)
-    }
-  }
-
-  // ===============================
-  // Sign Up
-  // ===============================
-  const signUp = async (
-    data: SignUpRequest,
-    isAdmin: boolean = false
-  ): Promise<{ success: boolean; error?: string; data?: SignupOTPRequestOut }> => {
-    try {
-      setIsLoading(true)
-
-      const response = isAdmin
-        ? await authApi.adminSignUp(data)
-        : await authApi.userSignUp(data)
-
-      if (response.error || !response.data) {
-        return { success: false, error: response.error || 'Sign up failed' }
+    } catch (error: any) {
+      console.error('❌ Sign in error:', error)
+      
+      // Clear any partial auth data
+      AUTH_STORAGE.clearAuth()
+      
+      // Extract error message
+      let errorMessage = 'An error occurred during sign in'
+      
+      if (error.response?.data?.detail) {
+        errorMessage = error.response.data.detail
+      } else if (error.message) {
+        errorMessage = error.message
       }
-
-      if (isAdmin) {
-        return await signIn({ email: data.email, password: data.password }, true)
+      
+      return { 
+        success: false, 
+        error: errorMessage 
       }
-
-      return { success: true, data: response.data as SignupOTPRequestOut }
-    } catch (error) {
-      console.error('Sign up error:', error)
-      return { success: false, error: error instanceof Error ? error.message : 'An error occurred' }
     } finally {
       setIsLoading(false)
     }
@@ -146,37 +223,43 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ===============================
   const signOut = () => {
     const actor = user?.actor
-    authStorage.clearAuth()
+    
+    AUTH_STORAGE.clearAuth()
     setToken(null)
     setUser(null)
-    router.push(actor === 'platform' ? '/auth/admin/sign-in' : '/auth/sign-in')
+    
+    // Redirect based on actor type
+    const redirectPath = actor === 'platform' 
+      ? '/auth/admin/sign-in' 
+      : '/auth/sign-in'
+    
+    router.push(redirectPath)
   }
 
   // ===============================
   // Refresh User
   // ===============================
   const refreshUser = async () => {
-    const currentToken = authStorage.getToken()
-    if (!currentToken) return
+    const currentToken = AUTH_STORAGE.getToken()
+    if (!currentToken || !user) return
 
     try {
-      const response = await authApi.getUserProfile(currentToken)
-      if (response.data && user?.actor) {
-        const refreshedUser: UserOut = {
-          ...response.data,
-          actor: user.actor,
-        }
-
+      // Only refresh org users for now
+      if (user.actor === 'org') {
+        const userResponse = await authApi.getCurrentOrgUser()
+        const refreshedUser = transformOrgUserResponse(userResponse)
+        
         setUser(refreshedUser)
-        authStorage.saveAuth({
-          access_token: currentToken,
-          token_type: 'bearer',
-          expires_in: 3600,
-          user: refreshedUser,
-        })
+        AUTH_STORAGE.saveAuth(
+          currentToken,
+          refreshedUser,
+          3600 // Default 1 hour
+        )
       }
     } catch (error) {
       console.error('Error refreshing user:', error)
+      // If refresh fails, sign out
+      signOut()
     }
   }
 
@@ -184,9 +267,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     user,
     token,
     isLoading,
-    isAuthenticated: !!user && !!token && !authStorage.isTokenExpired(),
+    isAuthenticated: !!user && !!token && !AUTH_STORAGE.isTokenExpired(),
     signIn,
-    signUp,
     signOut,
     refreshUser,
   }
@@ -194,8 +276,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 
+// ===============================
+// useAuth Hook
+// ===============================
+
 export function useAuth() {
   const context = useContext(AuthContext)
-  if (!context) throw new Error('useAuth must be used within an AuthProvider')
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider')
+  }
   return context
 }

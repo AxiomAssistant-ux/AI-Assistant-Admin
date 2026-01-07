@@ -1,117 +1,26 @@
 'use client'
 
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge, Button, Col, Form, Modal, Row } from 'react-bootstrap'
+import { Badge, Button, Col, Form, Modal, Row, Spinner } from 'react-bootstrap'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
 import { DataTable } from '@/components/table'
 import type { DataTableColumn, DataTableFilterControl } from '@/components/table'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
+import { actionItemsApi, type ActionItem, type ActionItemsListParams } from '@/api/org/action-items'
+import { appointmentsApi, type CreateAppointmentRequest } from '@/api/org/appointments'
+import { ordersApi, type CreateOrderRequest } from '@/api/org/orders'
+import { callLogsApi } from '@/api/org/call-logs'
 
-type ActionItem = {
-  _id: string
-  org_id: string
-  call_id?: string | null
-  type: 'appointment' | 'order' | 'incident' | 'follow_up' | 'task'
-  title: string
-  description?: string | null
-  urgency: boolean
-  status: 'pending' | 'in_progress' | 'completed' | 'dismissed'
-  assigned_to_user_id?: string | null
-  assigned_role?: string | null
-  due_at?: string | null
-  created_at: string
-  updated_at: string
-}
-
-const MOCK_ACTION_ITEMS: ActionItem[] = [
-  {
-    _id: 'action_001',
-    org_id: 'org_001',
-    call_id: 'call_abc123',
-    type: 'appointment',
-    title: 'Schedule follow-up appointment for John Doe',
-    description: 'Patient needs follow-up checkup in 2 weeks',
-    urgency: true,
-    status: 'pending',
-    assigned_to_user_id: 'user_001',
-    assigned_role: 'receptionist',
-    due_at: '2024-12-25T10:00:00Z',
-    created_at: '2024-12-18T09:30:00Z',
-    updated_at: '2024-12-18T09:30:00Z'
-  },
-  {
-    _id: 'action_002',
-    org_id: 'org_002',
-    call_id: 'call_def456',
-    type: 'order',
-    title: 'Process catering order for corporate event',
-    description: 'Large order for 50 people, vegetarian and non-vegetarian options',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: 'user_002',
-    assigned_role: 'chef',
-    due_at: '2024-12-20T14:00:00Z',
-    created_at: '2024-12-17T11:15:00Z',
-    updated_at: '2024-12-18T08:20:00Z'
-  },
-  {
-    _id: 'action_003',
-    org_id: 'org_001',
-    call_id: null,
-    type: 'follow_up',
-    title: 'Follow up with patient about lab results',
-    description: 'Lab results are ready, need to inform patient',
-    urgency: false,
-    status: 'completed',
-    assigned_to_user_id: 'user_003',
-    assigned_role: 'nurse',
-    due_at: '2024-12-19T16:00:00Z',
-    created_at: '2024-12-16T14:30:00Z',
-    updated_at: '2024-12-18T10:45:00Z'
-  },
-  {
-    _id: 'action_004',
-    org_id: 'org_003',
-    call_id: 'call_ghi789',
-    type: 'incident',
-    title: 'Equipment malfunction reported',
-    description: 'Dental chair in Room 3 not functioning properly',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: null,
-    assigned_role: 'maintenance',
-    due_at: '2024-12-19T09:00:00Z',
-    created_at: '2024-12-18T15:20:00Z',
-    updated_at: '2024-12-18T15:20:00Z'
-  },
-  {
-    _id: 'action_005',
-    org_id: 'org_001',
-    call_id: 'call_jkl012',
-    type: 'task',
-    title: 'Update patient records',
-    description: 'Add new insurance information to patient file',
-    urgency: false,
-    status: 'pending',
-    assigned_to_user_id: 'user_001',
-    assigned_role: 'admin',
-    due_at: null,
-    created_at: '2024-12-15T10:00:00Z',
-    updated_at: '2024-12-15T10:00:00Z'
-  }
-]
 
 const ActionItemsPage = () => {
-  const router = useRouter()
   const { token, user, isAuthenticated } = useAuth()
-  const isAdmin = Boolean(isAuthenticated && user?.role === 'admin')
 
-  const [actionItems, setActionItems] = useState<ActionItem[]>(MOCK_ACTION_ITEMS)
+  const [actionItems, setActionItems] = useState<ActionItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
@@ -133,6 +42,31 @@ const ActionItemsPage = () => {
   const [editingRole, setEditingRole] = useState<string | null>(null)
   const [roleValue, setRoleValue] = useState('')
 
+  const [confirmAppointmentModalOpen, setConfirmAppointmentModalOpen] = useState(false)
+  const [confirmOrderModalOpen, setConfirmOrderModalOpen] = useState(false)
+  const [confirmingItem, setConfirmingItem] = useState<ActionItem | null>(null)
+  const [callLogData, setCallLogData] = useState<any>(null)
+  const [loadingCallLog, setLoadingCallLog] = useState(false)
+  const [submittingConfirm, setSubmittingConfirm] = useState(false)
+
+  const [appointmentForm, setAppointmentForm] = useState({
+    customer_name: '',
+    customer_phone: '',
+    customer_email: '',
+    scheduled_at: ''
+  })
+
+  const [orderForm, setOrderForm] = useState({
+    customer_name: '',
+    customer_phone: '',
+    customer_email: '',
+    order_details: '',
+    total_amount: '',
+    currency: 'USD',
+    delivery_time: '',
+    special_instructions: ''
+  })
+
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim().toLowerCase()), 350)
     return () => clearTimeout(timer)
@@ -147,47 +81,205 @@ const ActionItemsPage = () => {
     setLoading(true)
     setError(null)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setActionItems(MOCK_ACTION_ITEMS)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load action items.')
+      const params: ActionItemsListParams = {
+        skip: (currentPage - 1) * pageSize,
+        limit: pageSize,
+        sort: 'newest',
+      }
+
+      if (typeFilter !== 'all') params.type_filter = typeFilter as any
+      if (statusFilter !== 'all') params.status_filter = statusFilter as any
+      if (urgencyFilter === 'urgent') params.urgency_filter = 'high'
+      else if (urgencyFilter === 'normal') params.urgency_filter = 'low'
+
+      const response = await actionItemsApi.list(params)
+      setActionItems(response.action_items)
+      setTotal(response.total)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Unable to load action items.')
+      toast.error('Failed to load action items')
     } finally {
       setLoading(false)
     }
-  }, [token, isAuthenticated])
+  }, [token, isAuthenticated, currentPage, pageSize, typeFilter, statusFilter, urgencyFilter])
 
   useEffect(() => {
     fetchActionItems()
   }, [fetchActionItems])
 
-  const filteredActionItems = useMemo(() => {
-    return actionItems.filter((item) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        item.title.toLowerCase().includes(debouncedSearch) ||
-        (item.description ?? '').toLowerCase().includes(debouncedSearch)
-
-      const matchesType = typeFilter === 'all' || item.type === typeFilter
-      const matchesStatus = statusFilter === 'all' || item.status === statusFilter
-      const matchesUrgency = 
-        urgencyFilter === 'all' || 
-        (urgencyFilter === 'urgent' && item.urgency) ||
-        (urgencyFilter === 'normal' && !item.urgency)
-
-      return matchesSearch && matchesType && matchesStatus && matchesUrgency
-    })
-  }, [actionItems, debouncedSearch, typeFilter, statusFilter, urgencyFilter])
-
-  const totalRecords = filteredActionItems.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const startIndex = (currentPage - 1) * pageSize
-  const paginatedActionItems = filteredActionItems.slice(startIndex, startIndex + pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) {
       setCurrentPage(totalPages)
     }
   }, [currentPage, totalPages])
+
+  const loadCallLogData = async (callId: string) => {
+    setLoadingCallLog(true)
+    try {
+      const callLog = await callLogsApi.getById(callId)
+      setCallLogData(callLog)
+      return callLog
+    } catch (err) {
+      console.error('Failed to load call log:', err)
+      toast.error('Failed to load call details')
+      return null
+    } finally {
+      setLoadingCallLog(false)
+    }
+  }
+
+  const handleConfirmAppointment = async (item: ActionItem) => {
+    setConfirmingItem(item)
+    setCallLogData(null)
+    
+    if (item.call_id) {
+      const callLog = await loadCallLogData(item.call_id)
+      if (callLog) {
+        setAppointmentForm({
+          customer_name: callLog.caller?.name || '',
+          customer_phone: callLog.caller?.number || '',
+          customer_email: callLog.caller?.email || '',
+          scheduled_at: item.due_at ? new Date(item.due_at).toISOString().slice(0, 16) : ''
+        })
+      }
+    } else {
+      setAppointmentForm({
+        customer_name: '',
+        customer_phone: '',
+        customer_email: '',
+        scheduled_at: item.due_at ? new Date(item.due_at).toISOString().slice(0, 16) : ''
+      })
+    }
+    
+    setConfirmAppointmentModalOpen(true)
+  }
+
+  const handleConfirmOrder = async (item: ActionItem) => {
+    setConfirmingItem(item)
+    setCallLogData(null)
+    
+    if (item.call_id) {
+      const callLog = await loadCallLogData(item.call_id)
+      if (callLog) {
+        setOrderForm({
+          customer_name: callLog.caller?.name || '',
+          customer_phone: callLog.caller?.number || '',
+          customer_email: callLog.caller?.email || '',
+          order_details: item.description || '',
+          total_amount: '',
+          currency: 'USD',
+          delivery_time: item.due_at ? new Date(item.due_at).toISOString().slice(0, 16) : '',
+          special_instructions: ''
+        })
+      }
+    } else {
+      setOrderForm({
+        customer_name: '',
+        customer_phone: '',
+        customer_email: '',
+        order_details: item.description || '',
+        total_amount: '',
+        currency: 'USD',
+        delivery_time: item.due_at ? new Date(item.due_at).toISOString().slice(0, 16) : '',
+        special_instructions: ''
+      })
+    }
+    
+    setConfirmOrderModalOpen(true)
+  }
+
+  const submitAppointment = async () => {
+    if (!confirmingItem) return
+    
+    if (!appointmentForm.customer_name || !appointmentForm.customer_phone || !appointmentForm.scheduled_at) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setSubmittingConfirm(true)
+    try {
+      const appointmentData: CreateAppointmentRequest = {
+        call_id: confirmingItem.call_id || null,
+        customer_name: appointmentForm.customer_name,
+        customer_phone: appointmentForm.customer_phone,
+        customer_email: appointmentForm.customer_email || null,
+        scheduled_at: new Date(appointmentForm.scheduled_at).toISOString()
+      }
+
+      await appointmentsApi.create(appointmentData)
+      
+      // Mark action item as completed
+      await actionItemsApi.update(confirmingItem.id, { status: 'completed' })
+      
+      toast.success('Appointment created successfully!')
+      setConfirmAppointmentModalOpen(false)
+      setConfirmingItem(null)
+      setAppointmentForm({
+        customer_name: '',
+        customer_phone: '',
+        customer_email: '',
+        scheduled_at: ''
+      })
+      fetchActionItems()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to create appointment')
+    } finally {
+      setSubmittingConfirm(false)
+    }
+  }
+
+  const submitOrder = async () => {
+    if (!confirmingItem) return
+    
+    if (!orderForm.customer_name || !orderForm.customer_phone || !orderForm.order_details) {
+      toast.error('Please fill in all required fields')
+      return
+    }
+
+    setSubmittingConfirm(true)
+    try {
+      const orderData: CreateOrderRequest = {
+        call_id: confirmingItem.call_id || null,
+        customer_name: orderForm.customer_name,
+        customer_phone: orderForm.customer_phone,
+        customer_email: orderForm.customer_email || null,
+        order_details: orderForm.order_details,
+        total_amount: orderForm.total_amount ? parseFloat(orderForm.total_amount) : null,
+        currency: orderForm.currency,
+        urgency: confirmingItem.urgency === 'high' || confirmingItem.urgency === 'critical',
+        assigned_role: confirmingItem.assigned_role || null,
+        delivery_time: orderForm.delivery_time ? new Date(orderForm.delivery_time).toISOString() : null,
+        special_instructions: orderForm.special_instructions || null
+      }
+
+      await ordersApi.create(orderData)
+      
+      // Mark action item as completed
+      await actionItemsApi.update(confirmingItem.id, { status: 'completed' })
+      
+      toast.success('Order created successfully!')
+      setConfirmOrderModalOpen(false)
+      setConfirmingItem(null)
+      setOrderForm({
+        customer_name: '',
+        customer_phone: '',
+        customer_email: '',
+        order_details: '',
+        total_amount: '',
+        currency: 'USD',
+        delivery_time: '',
+        special_instructions: ''
+      })
+      fetchActionItems()
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to create order')
+    } finally {
+      setSubmittingConfirm(false)
+    }
+  }
 
   const handleStatusToggle = async (itemId: string, currentStatus: ActionItem['status']) => {
     const statusFlow: Record<ActionItem['status'], ActionItem['status']> = {
@@ -200,13 +292,13 @@ const ActionItemsPage = () => {
 
     setUpdatingField({ itemId, field: 'status' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await actionItemsApi.update(itemId, { status: newStatus })
       
       setActionItems(prev => prev.map(item =>
-        item._id === itemId ? { ...item, status: newStatus, updated_at: new Date().toISOString() } : item
+        item.id === itemId ? { ...item, status: newStatus, updated_at: new Date().toISOString() } : item
       ))
       
-      if (selectedItem && selectedItem._id === itemId) {
+      if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, status: newStatus, updated_at: new Date().toISOString() })
       }
       
@@ -218,17 +310,19 @@ const ActionItemsPage = () => {
     }
   }
 
-  const handleUrgencyToggle = async (itemId: string, currentUrgency: boolean) => {
+  const handleUrgencyToggle = async (itemId: string, currentUrgency: ActionItem['urgency']) => {
+    const newUrgency = (currentUrgency === 'high' || currentUrgency === 'critical') ? 'low' : 'high'
+    
     setUpdatingField({ itemId, field: 'urgency' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await actionItemsApi.update(itemId, { urgency: newUrgency })
       
       setActionItems(prev => prev.map(item =>
-        item._id === itemId ? { ...item, urgency: !currentUrgency, updated_at: new Date().toISOString() } : item
+        item.id === itemId ? { ...item, urgency: newUrgency, updated_at: new Date().toISOString() } : item
       ))
       
-      if (selectedItem && selectedItem._id === itemId) {
-        setSelectedItem({ ...selectedItem, urgency: !currentUrgency, updated_at: new Date().toISOString() })
+      if (selectedItem && selectedItem.id === itemId) {
+        setSelectedItem({ ...selectedItem, urgency: newUrgency, updated_at: new Date().toISOString() })
       }
       
       toast.success('Urgency updated successfully')
@@ -247,15 +341,14 @@ const ActionItemsPage = () => {
 
     setUpdatingField({ itemId, field: 'due_at' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
       const newDueDate = new Date(dueDateValue).toISOString()
+      await actionItemsApi.update(itemId, { due_at: newDueDate })
       
       setActionItems(prev => prev.map(item =>
-        item._id === itemId ? { ...item, due_at: newDueDate, updated_at: new Date().toISOString() } : item
+        item.id === itemId ? { ...item, due_at: newDueDate, updated_at: new Date().toISOString() } : item
       ))
       
-      if (selectedItem && selectedItem._id === itemId) {
+      if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, due_at: newDueDate, updated_at: new Date().toISOString() })
       }
       
@@ -276,13 +369,13 @@ const ActionItemsPage = () => {
 
     setUpdatingField({ itemId, field: 'assigned_role' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await actionItemsApi.update(itemId, { assigned_role: roleValue.trim() })
       
       setActionItems(prev => prev.map(item =>
-        item._id === itemId ? { ...item, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : item
+        item.id === itemId ? { ...item, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : item
       ))
       
-      if (selectedItem && selectedItem._id === itemId) {
+      if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() })
       }
       
@@ -335,6 +428,10 @@ const ActionItemsPage = () => {
       case 'dismissed': return 'secondary'
       default: return 'secondary'
     }
+  }
+
+  const isUrgent = (urgency: ActionItem['urgency']) => {
+    return urgency === 'high' || urgency === 'critical'
   }
 
   const toolbarFilters: DataTableFilterControl[] = useMemo(
@@ -430,26 +527,26 @@ const ActionItemsPage = () => {
         width: 110,
         render: (item) => (
           <div
-            onClick={() => updatingField?.itemId !== item._id && handleUrgencyToggle(item._id, item.urgency)}
-            style={{ cursor: updatingField?.itemId === item._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.itemId !== item.id && handleUrgencyToggle(item.id, item.urgency)}
+            style={{ cursor: updatingField?.itemId === item.id ? 'not-allowed' : 'pointer' }}
             title="Click to toggle urgency"
           >
             <Badge
-              bg={item.urgency ? 'danger' : 'secondary'}
+              bg={isUrgent(item.urgency) ? 'danger' : 'secondary'}
               className="d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.itemId === item._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.itemId === item.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.itemId === item._id && updatingField.field === 'urgency' ? (
+              {updatingField?.itemId === item.id && updatingField.field === 'urgency' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   <span className="small">...</span>
                 </>
               ) : (
                 <>
-                  {item.urgency ? 'URGENT' : 'NORMAL'}
+                  {isUrgent(item.urgency) ? 'URGENT' : 'NORMAL'}
                   <IconifyIcon icon="solar:refresh-linear" width={12} height={12} />
                 </>
               )}
@@ -463,19 +560,19 @@ const ActionItemsPage = () => {
         width: 150,
         render: (item) => (
           <div
-            onClick={() => updatingField?.itemId !== item._id && handleStatusToggle(item._id, item.status)}
-            style={{ cursor: updatingField?.itemId === item._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.itemId !== item.id && handleStatusToggle(item.id, item.status)}
+            style={{ cursor: updatingField?.itemId === item.id ? 'not-allowed' : 'pointer' }}
             title="Click to cycle status"
           >
             <Badge
               bg={getStatusVariant(item.status)}
               className="text-capitalize d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.itemId === item._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.itemId === item.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.itemId === item._id && updatingField.field === 'status' ? (
+              {updatingField?.itemId === item.id && updatingField.field === 'status' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   Updating...
@@ -513,18 +610,40 @@ const ActionItemsPage = () => {
       {
         key: 'actions',
         header: 'Actions',
-        width: 100,
+        width: 200,
         align: 'center',
         sticky: 'right',
         render: (item) => (
-          <Button
-            size="sm"
-            variant="outline-primary"
-            onClick={() => handleViewItem(item)}
-            title="View details"
-          >
-            <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
-          </Button>
+          <div className="d-flex gap-1 justify-content-center">
+            <Button
+              size="sm"
+              variant="outline-primary"
+              onClick={() => handleViewItem(item)}
+              title="View details"
+            >
+              <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
+            </Button>
+            {item.type === 'appointment' && item.status !== 'completed' && (
+              <Button
+                size="sm"
+                variant="outline-success"
+                onClick={() => handleConfirmAppointment(item)}
+                title="Confirm Appointment"
+              >
+                <IconifyIcon icon="solar:calendar-mark-linear" width={16} height={16} />
+              </Button>
+            )}
+            {item.type === 'order' && item.status !== 'completed' && (
+              <Button
+                size="sm"
+                variant="outline-info"
+                onClick={() => handleConfirmOrder(item)}
+                title="Confirm Order"
+              >
+                <IconifyIcon icon="solar:bag-check-linear" width={16} height={16} />
+              </Button>
+            )}
+          </div>
         )
       }
     ],
@@ -559,8 +678,8 @@ const ActionItemsPage = () => {
             title="All Action Items"
             description="Track and manage action items generated from calls and manual entries."
             columns={columns}
-            data={paginatedActionItems}
-            rowKey={(item) => item._id}
+            data={actionItems}
+            rowKey={(item) => item.id}
             loading={loading}
             error={error}
             onRetry={fetchActionItems}
@@ -578,13 +697,13 @@ const ActionItemsPage = () => {
             pagination={{
               currentPage,
               pageSize,
-              totalRecords,
+              totalRecords: total,
               totalPages,
               onPageChange: setCurrentPage,
               onPageSizeChange: setPageSize,
               pageSizeOptions: [10, 25, 50],
               startRecord: startIndex + 1,
-              endRecord: Math.min(startIndex + pageSize, totalRecords)
+              endRecord: Math.min(startIndex + pageSize, total)
             }}
             emptyState={{
               title: 'No action items found',
@@ -595,6 +714,7 @@ const ActionItemsPage = () => {
         </Col>
       </Row>
 
+      {/* View Modal */}
       <Modal show={viewModalOpen} onHide={() => setViewModalOpen(false)} size="lg" centered>
         <Modal.Header closeButton>
           <Modal.Title>Action Item Details</Modal.Title>
@@ -605,7 +725,7 @@ const ActionItemsPage = () => {
               <Row className="g-3 mb-3">
                 <Col md={6}>
                   <label className="text-muted small">Item ID</label>
-                  <div className="fw-medium font-monospace small">{selectedItem._id}</div>
+                  <div className="fw-medium font-monospace small">{selectedItem.id}</div>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Call ID</label>
@@ -623,23 +743,23 @@ const ActionItemsPage = () => {
                   <label className="text-muted small">Urgency</label>
                   <div>
                     <div
-                      onClick={() => handleUrgencyToggle(selectedItem._id, selectedItem.urgency)}
+                      onClick={() => handleUrgencyToggle(selectedItem.id, selectedItem.urgency)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to toggle"
                     >
                       <Badge
-                        bg={selectedItem.urgency ? 'danger' : 'secondary'}
+                        bg={isUrgent(selectedItem.urgency) ? 'danger' : 'secondary'}
                         className="d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.itemId === selectedItem._id && updatingField.field === 'urgency' ? (
+                        {updatingField?.itemId === selectedItem.id && updatingField.field === 'urgency' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             <span className="small">Updating...</span>
                           </>
                         ) : (
                           <>
-                            {selectedItem.urgency ? 'URGENT' : 'NORMAL'}
+                            {isUrgent(selectedItem.urgency) ? 'URGENT' : 'NORMAL'}
                             <IconifyIcon icon="solar:refresh-linear" width={12} height={12} />
                           </>
                         )}
@@ -651,7 +771,7 @@ const ActionItemsPage = () => {
                   <label className="text-muted small">Status</label>
                   <div>
                     <div
-                      onClick={() => handleStatusToggle(selectedItem._id, selectedItem.status)}
+                      onClick={() => handleStatusToggle(selectedItem.id, selectedItem.status)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to cycle status"
                     >
@@ -660,7 +780,7 @@ const ActionItemsPage = () => {
                         className="text-capitalize d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.itemId === selectedItem._id && updatingField.field === 'status' ? (
+                        {updatingField?.itemId === selectedItem.id && updatingField.field === 'status' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             Updating...
@@ -684,7 +804,7 @@ const ActionItemsPage = () => {
                         variant="link"
                         className="p-0 text-decoration-none"
                         onClick={() => {
-                          setEditingRole(selectedItem._id)
+                          setEditingRole(selectedItem.id)
                           setRoleValue(selectedItem.assigned_role || '')
                         }}
                       >
@@ -692,7 +812,7 @@ const ActionItemsPage = () => {
                       </Button>
                     )}
                   </label>
-                  {editingRole === selectedItem._id ? (
+                  {editingRole === selectedItem.id ? (
                     <div className="d-flex gap-2">
                       <Form.Control
                         size="sm"
@@ -704,10 +824,10 @@ const ActionItemsPage = () => {
                       <Button
                         size="sm"
                         variant="success"
-                        onClick={() => handleRoleSave(selectedItem._id)}
-                        disabled={updatingField?.itemId === selectedItem._id}
+                        onClick={() => handleRoleSave(selectedItem.id)}
+                        disabled={updatingField?.itemId === selectedItem.id}
                       >
-                        {updatingField?.itemId === selectedItem._id && updatingField.field === 'assigned_role' ? (
+                        {updatingField?.itemId === selectedItem.id && updatingField.field === 'assigned_role' ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
                           <IconifyIcon icon="solar:check-circle-linear" width={16} height={16} />
@@ -734,7 +854,7 @@ const ActionItemsPage = () => {
                         variant="link"
                         className="p-0 text-decoration-none"
                         onClick={() => {
-                          setEditingDueDate(selectedItem._id)
+                          setEditingDueDate(selectedItem.id)
                           setDueDateValue(formatDateInput(selectedItem.due_at))
                         }}
                       >
@@ -742,7 +862,7 @@ const ActionItemsPage = () => {
                       </Button>
                     )}
                   </label>
-                  {editingDueDate === selectedItem._id ? (
+                  {editingDueDate === selectedItem.id ? (
                     <div className="d-flex gap-2">
                       <Form.Control
                         type="datetime-local"
@@ -754,10 +874,10 @@ const ActionItemsPage = () => {
                       <Button
                         size="sm"
                         variant="success"
-                        onClick={() => handleDueDateSave(selectedItem._id)}
-                        disabled={updatingField?.itemId === selectedItem._id}
+                        onClick={() => handleDueDateSave(selectedItem.id)}
+                        disabled={updatingField?.itemId === selectedItem.id}
                       >
-                        {updatingField?.itemId === selectedItem._id && updatingField.field === 'due_at' ? (
+                        {updatingField?.itemId === selectedItem.id && updatingField.field === 'due_at' ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
                           <IconifyIcon icon="solar:check-circle-linear" width={16} height={16} />
@@ -796,12 +916,238 @@ const ActionItemsPage = () => {
                   <div>{formatDate(selectedItem.updated_at)}</div>
                 </Col>
               </Row>
+              {selectedItem.type === 'appointment' && selectedItem.status !== 'completed' && (
+                <>
+                  <hr />
+                  <Button variant="success" onClick={() => handleConfirmAppointment(selectedItem)} className="w-100">
+                    <IconifyIcon icon="solar:calendar-mark-linear" width={18} height={18} className="me-2" />
+                    Confirm Appointment
+                  </Button>
+                </>
+              )}
+              {selectedItem.type === 'order' && selectedItem.status !== 'completed' && (
+                <>
+                  <hr />
+                  <Button variant="info" onClick={() => handleConfirmOrder(selectedItem)} className="w-100">
+                    <IconifyIcon icon="solar:bag-check-linear" width={18} height={18} className="me-2" />
+                    Confirm Order
+                  </Button>
+                </>
+              )}
             </div>
           )}
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setViewModalOpen(false)}>
             Close
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Confirm Appointment Modal */}
+      <Modal show={confirmAppointmentModalOpen} onHide={() => setConfirmAppointmentModalOpen(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Appointment</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {loadingCallLog ? (
+            <div className="text-center py-4">
+              <Spinner animation="border" variant="primary" />
+              <p className="text-muted mt-2">Loading call details...</p>
+            </div>
+          ) : (
+            <Form>
+              <Row className="g-3">
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Customer Name <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      value={appointmentForm.customer_name}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customer_name: e.target.value })}
+                      placeholder="Enter customer name"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Customer Phone <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      value={appointmentForm.customer_phone}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customer_phone: e.target.value })}
+                      placeholder="Enter phone number"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Customer Email</Form.Label>
+                    <Form.Control
+                      type="email"
+                      value={appointmentForm.customer_email}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, customer_email: e.target.value })}
+                      placeholder="Enter email"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Scheduled Date & Time <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      type="datetime-local"
+                      value={appointmentForm.scheduled_at}
+                      onChange={(e) => setAppointmentForm({ ...appointmentForm, scheduled_at: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Form>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setConfirmAppointmentModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="success" onClick={submitAppointment} disabled={submittingConfirm || loadingCallLog}>
+            {submittingConfirm ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <IconifyIcon icon="solar:calendar-mark-linear" width={18} height={18} className="me-2" />
+                Create Appointment
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Confirm Order Modal */}
+      <Modal show={confirmOrderModalOpen} onHide={() => setConfirmOrderModalOpen(false)} size="lg" centered>
+        <Modal.Header closeButton>
+          <Modal.Title>Confirm Order</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {loadingCallLog ? (
+            <div className="text-center py-4">
+              <Spinner animation="border" variant="primary" />
+              <p className="text-muted mt-2">Loading call details...</p>
+            </div>
+          ) : (
+            <Form>
+              <Row className="g-3">
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Customer Name <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      value={orderForm.customer_name}
+                      onChange={(e) => setOrderForm({ ...orderForm, customer_name: e.target.value })}
+                      placeholder="Enter customer name"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Customer Phone <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      value={orderForm.customer_phone}
+                      onChange={(e) => setOrderForm({ ...orderForm, customer_phone: e.target.value })}
+                      placeholder="Enter phone number"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Customer Email</Form.Label>
+                    <Form.Control
+                      type="email"
+                      value={orderForm.customer_email}
+                      onChange={(e) => setOrderForm({ ...orderForm, customer_email: e.target.value })}
+                      placeholder="Enter email"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Order Details <span className="text-danger">*</span></Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={3}
+                      value={orderForm.order_details}
+                      onChange={(e) => setOrderForm({ ...orderForm, order_details: e.target.value })}
+                      placeholder="Enter order details"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Total Amount</Form.Label>
+                    <Form.Control
+                      type="number"
+                      step="0.01"
+                      value={orderForm.total_amount}
+                      onChange={(e) => setOrderForm({ ...orderForm, total_amount: e.target.value })}
+                      placeholder="0.00"
+                    />
+                  </Form.Group>
+                </Col>
+                <Col md={6}>
+                  <Form.Group>
+                    <Form.Label>Currency</Form.Label>
+                    <Form.Select
+                      value={orderForm.currency}
+                      onChange={(e) => setOrderForm({ ...orderForm, currency: e.target.value })}
+                    >
+                      <option value="USD">USD</option>
+                      <option value="EUR">EUR</option>
+                      <option value="GBP">GBP</option>
+                      <option value="PKR">PKR</option>
+                    </Form.Select>
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Delivery Time</Form.Label>
+                    <Form.Control
+                      type="datetime-local"
+                      value={orderForm.delivery_time}
+                      onChange={(e) => setOrderForm({ ...orderForm, delivery_time: e.target.value })}
+                    />
+                  </Form.Group>
+                </Col>
+                <Col xs={12}>
+                  <Form.Group>
+                    <Form.Label>Special Instructions</Form.Label>
+                    <Form.Control
+                      as="textarea"
+                      rows={2}
+                      value={orderForm.special_instructions}
+                      onChange={(e) => setOrderForm({ ...orderForm, special_instructions: e.target.value })}
+                      placeholder="Any special instructions..."
+                    />
+                  </Form.Group>
+                </Col>
+              </Row>
+            </Form>
+          )}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setConfirmOrderModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="info" onClick={submitOrder} disabled={submittingConfirm || loadingCallLog}>
+            {submittingConfirm ? (
+              <>
+                <span className="spinner-border spinner-border-sm me-2" role="status" />
+                Creating...
+              </>
+            ) : (
+              <>
+                <IconifyIcon icon="solar:bag-check-linear" width={18} height={18} className="me-2" />
+                Create Order
+              </>
+            )}
           </Button>
         </Modal.Footer>
       </Modal>

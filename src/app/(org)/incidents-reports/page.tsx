@@ -8,135 +8,30 @@ import type { DataTableColumn, DataTableFilterControl } from '@/components/table
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
+import { actionItemsApi, type ActionItem, type ActionItemsListParams } from '@/api/org/action-items'
 
-type Incident = {
-  _id: string
-  org_id: string
-  call_id?: string | null
-  title: string
-  description?: string | null
-  urgency: boolean
-  status: 'pending' | 'in_progress' | 'completed' | 'dismissed'
-  assigned_to_user_id?: string | null
-  assigned_role?: string | null
-  reported_by?: string | null
-  resolved_at?: string | null
-  created_at: string
-  updated_at: string
-}
-
-const MOCK_INCIDENTS: Incident[] = [
-  {
-    _id: 'inc_001',
-    org_id: 'org_001',
-    call_id: 'call_abc123',
-    title: 'Equipment malfunction in Room 3',
-    description: 'Dental chair not functioning properly, motor making unusual noise',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: 'user_001',
-    assigned_role: 'maintenance',
-    reported_by: 'Dr. Sarah Johnson',
-    resolved_at: null,
-    created_at: '2024-12-18T09:30:00Z',
-    updated_at: '2024-12-18T10:15:00Z'
-  },
-  {
-    _id: 'inc_002',
-    org_id: 'org_002',
-    call_id: 'call_def456',
-    title: 'Safety hazard - Wet floor in kitchen area',
-    description: 'Water leak from dishwasher causing slippery surface',
-    urgency: true,
-    status: 'pending',
-    assigned_to_user_id: 'user_002',
-    assigned_role: 'facilities',
-    reported_by: 'Chef Michael',
-    resolved_at: null,
-    created_at: '2024-12-18T11:15:00Z',
-    updated_at: '2024-12-18T11:15:00Z'
-  },
-  {
-    _id: 'inc_003',
-    org_id: 'org_001',
-    call_id: null,
-    title: 'AC unit not cooling properly',
-    description: 'Reception area temperature too high, AC making strange sounds',
-    urgency: false,
-    status: 'completed',
-    assigned_to_user_id: 'user_003',
-    assigned_role: 'maintenance',
-    reported_by: 'Receptionist Amy',
-    resolved_at: '2024-12-18T16:30:00Z',
-    created_at: '2024-12-17T14:30:00Z',
-    updated_at: '2024-12-18T16:30:00Z'
-  },
-  {
-    _id: 'inc_004',
-    org_id: 'org_003',
-    call_id: 'call_ghi789',
-    title: 'Broken chair in waiting room',
-    description: 'Chair leg broken, potential injury risk for patients',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: null,
-    assigned_role: 'facilities',
-    reported_by: 'Nurse Linda',
-    resolved_at: null,
-    created_at: '2024-12-18T15:20:00Z',
-    updated_at: '2024-12-18T15:45:00Z'
-  },
-  {
-    _id: 'inc_005',
-    org_id: 'org_001',
-    call_id: 'call_jkl012',
-    title: 'Computer system slow performance',
-    description: 'Appointment booking system taking too long to load',
-    urgency: false,
-    status: 'pending',
-    assigned_to_user_id: 'user_001',
-    assigned_role: 'IT support',
-    reported_by: 'Admin staff',
-    resolved_at: null,
-    created_at: '2024-12-17T10:00:00Z',
-    updated_at: '2024-12-17T10:00:00Z'
-  },
-  {
-    _id: 'inc_006',
-    org_id: 'org_002',
-    call_id: null,
-    title: 'Fire alarm system malfunction',
-    description: 'False alarms triggering every hour, needs inspection',
-    urgency: true,
-    status: 'in_progress',
-    assigned_to_user_id: 'user_004',
-    assigned_role: 'building management',
-    reported_by: 'Security',
-    resolved_at: null,
-    created_at: '2024-12-18T08:00:00Z',
-    updated_at: '2024-12-18T09:30:00Z'
-  }
-]
+import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 
 const IncidentsPage = () => {
+  useFeatureGuard()
   const { token, user, isAuthenticated } = useAuth()
   const isAdmin = Boolean(isAuthenticated && user?.role === 'admin')
 
-  const [incidents, setIncidents] = useState<Incident[]>(MOCK_INCIDENTS)
+  const [incidents, setIncidents] = useState<ActionItem[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [total, setTotal] = useState(0)
 
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [urgencyFilter, setUrgencyFilter] = useState('all')
   const [showFilters, setShowFilters] = useState(true)
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
   const [viewModalOpen, setViewModalOpen] = useState(false)
-  const [selectedIncident, setSelectedIncident] = useState<Incident | null>(null)
+  const [selectedIncident, setSelectedIncident] = useState<ActionItem | null>(null)
   const [updatingField, setUpdatingField] = useState<{ incidentId: string; field: string } | null>(null)
 
   const [editingRole, setEditingRole] = useState<string | null>(null)
@@ -149,48 +44,40 @@ const IncidentsPage = () => {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [debouncedSearch, statusFilter, urgencyFilter])
+  }, [debouncedSearch, statusFilter])
 
   const fetchIncidents = useCallback(async () => {
     if (!token || !isAuthenticated) return
     setLoading(true)
     setError(null)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setIncidents(MOCK_INCIDENTS)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load incidents.')
+      const params: ActionItemsListParams = {
+        skip: (currentPage - 1) * pageSize,
+        limit: pageSize,
+        sort: 'newest',
+        type_filter: 'incident', // Always filter for incidents only
+        urgency_filter: 'high', // Always filter for urgent incidents only
+      }
+
+      if (statusFilter !== 'all') params.status_filter = statusFilter as any
+
+      const response = await actionItemsApi.list(params)
+      setIncidents(response.action_items)
+      setTotal(response.total)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Unable to load incidents.')
+      toast.error('Failed to load incidents')
     } finally {
       setLoading(false)
     }
-  }, [token, isAuthenticated])
+  }, [token, isAuthenticated, currentPage, pageSize, statusFilter])
 
   useEffect(() => {
     fetchIncidents()
   }, [fetchIncidents])
 
-  const filteredIncidents = useMemo(() => {
-    return incidents.filter((incident) => {
-      const matchesSearch =
-        !debouncedSearch ||
-        incident.title.toLowerCase().includes(debouncedSearch) ||
-        (incident.description ?? '').toLowerCase().includes(debouncedSearch) ||
-        (incident.reported_by ?? '').toLowerCase().includes(debouncedSearch)
-
-      const matchesStatus = statusFilter === 'all' || incident.status === statusFilter
-      const matchesUrgency = 
-        urgencyFilter === 'all' || 
-        (urgencyFilter === 'urgent' && incident.urgency) ||
-        (urgencyFilter === 'normal' && !incident.urgency)
-
-      return matchesSearch && matchesStatus && matchesUrgency
-    })
-  }, [incidents, debouncedSearch, statusFilter, urgencyFilter])
-
-  const totalRecords = filteredIncidents.length
-  const totalPages = Math.max(1, Math.ceil(totalRecords / pageSize))
+  const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const startIndex = (currentPage - 1) * pageSize
-  const paginatedIncidents = filteredIncidents.slice(startIndex, startIndex + pageSize)
 
   useEffect(() => {
     if (currentPage > totalPages) {
@@ -198,8 +85,8 @@ const IncidentsPage = () => {
     }
   }, [currentPage, totalPages])
 
-  const handleStatusToggle = async (incidentId: string, currentStatus: Incident['status']) => {
-    const statusFlow: Record<Incident['status'], Incident['status']> = {
+  const handleStatusToggle = async (incidentId: string, currentStatus: ActionItem['status']) => {
+    const statusFlow: Record<ActionItem['status'], ActionItem['status']> = {
       pending: 'in_progress',
       in_progress: 'completed',
       completed: 'dismissed',
@@ -209,23 +96,14 @@ const IncidentsPage = () => {
 
     setUpdatingField({ incidentId, field: 'status' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      
-      const updates: Partial<Incident> = { 
-        status: newStatus, 
-        updated_at: new Date().toISOString() 
-      }
-      
-      if (newStatus === 'completed') {
-        updates.resolved_at = new Date().toISOString()
-      }
+      await actionItemsApi.update(incidentId, { status: newStatus })
       
       setIncidents(prev => prev.map(incident =>
-        incident._id === incidentId ? { ...incident, ...updates } : incident
+        incident.id === incidentId ? { ...incident, status: newStatus, updated_at: new Date().toISOString() } : incident
       ))
       
-      if (selectedIncident && selectedIncident._id === incidentId) {
-        setSelectedIncident({ ...selectedIncident, ...updates })
+      if (selectedIncident && selectedIncident.id === incidentId) {
+        setSelectedIncident({ ...selectedIncident, status: newStatus, updated_at: new Date().toISOString() })
       }
       
       toast.success('Status updated successfully')
@@ -236,17 +114,19 @@ const IncidentsPage = () => {
     }
   }
 
-  const handleUrgencyToggle = async (incidentId: string, currentUrgency: boolean) => {
+  const handleUrgencyToggle = async (incidentId: string, currentUrgency: ActionItem['urgency']) => {
+    const newUrgency = (currentUrgency === 'high' || currentUrgency === 'critical') ? 'low' : 'high'
+    
     setUpdatingField({ incidentId, field: 'urgency' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await actionItemsApi.update(incidentId, { urgency: newUrgency })
       
       setIncidents(prev => prev.map(incident =>
-        incident._id === incidentId ? { ...incident, urgency: !currentUrgency, updated_at: new Date().toISOString() } : incident
+        incident.id === incidentId ? { ...incident, urgency: newUrgency, updated_at: new Date().toISOString() } : incident
       ))
       
-      if (selectedIncident && selectedIncident._id === incidentId) {
-        setSelectedIncident({ ...selectedIncident, urgency: !currentUrgency, updated_at: new Date().toISOString() })
+      if (selectedIncident && selectedIncident.id === incidentId) {
+        setSelectedIncident({ ...selectedIncident, urgency: newUrgency, updated_at: new Date().toISOString() })
       }
       
       toast.success('Urgency updated successfully')
@@ -265,13 +145,13 @@ const IncidentsPage = () => {
 
     setUpdatingField({ incidentId, field: 'assigned_role' })
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await actionItemsApi.update(incidentId, { assigned_role: roleValue.trim() })
       
       setIncidents(prev => prev.map(incident =>
-        incident._id === incidentId ? { ...incident, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : incident
+        incident.id === incidentId ? { ...incident, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : incident
       ))
       
-      if (selectedIncident && selectedIncident._id === incidentId) {
+      if (selectedIncident && selectedIncident.id === incidentId) {
         setSelectedIncident({ ...selectedIncident, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() })
       }
       
@@ -284,7 +164,7 @@ const IncidentsPage = () => {
     }
   }
 
-  const handleViewIncident = (incident: Incident) => {
+  const handleViewIncident = (incident: ActionItem) => {
     setSelectedIncident(incident)
     setViewModalOpen(true)
   }
@@ -310,6 +190,10 @@ const IncidentsPage = () => {
     }
   }
 
+  const isUrgent = (urgency: ActionItem['urgency']) => {
+    return urgency === 'high' || urgency === 'critical'
+  }
+
   const toolbarFilters: DataTableFilterControl[] = useMemo(
     () => [
       {
@@ -327,32 +211,17 @@ const IncidentsPage = () => {
         onChange: (value) => setStatusFilter(value || 'all'),
         onClear: () => setStatusFilter('all'),
         width: 4
-      },
-      {
-        id: 'urgency-filter',
-        label: 'Urgency',
-        type: 'select',
-        value: urgencyFilter === 'all' ? '' : urgencyFilter,
-        options: [
-          { label: 'All urgencies', value: '' },
-          { label: 'Urgent', value: 'urgent' },
-          { label: 'Normal', value: 'normal' }
-        ],
-        onChange: (value) => setUrgencyFilter(value || 'all'),
-        onClear: () => setUrgencyFilter('all'),
-        width: 4
       }
     ],
-    [statusFilter, urgencyFilter]
+    [statusFilter]
   )
 
-  const columns: DataTableColumn<Incident>[] = useMemo(
+  const columns: DataTableColumn<ActionItem>[] = useMemo(
     () => [
       {
         key: 'serial',
         header: '#',
         width: 60,
-        // render: (_, index) => <span className="text-muted">{startIndex + index + 1}</span>
         render: (_, { rowIndex }) => <span className="text-muted">{startIndex + rowIndex + 1}</span>
       },
       {
@@ -368,12 +237,6 @@ const IncidentsPage = () => {
                 {incident.description.length > 60 ? '...' : ''}
               </small>
             )}
-            {incident.reported_by && (
-              <small className="text-muted d-block">
-                <IconifyIcon icon="solar:user-linear" width={12} height={12} className="me-1" />
-                Reported by: {incident.reported_by}
-              </small>
-            )}
           </div>
         )
       },
@@ -383,26 +246,26 @@ const IncidentsPage = () => {
         width: 110,
         render: (incident) => (
           <div
-            onClick={() => updatingField?.incidentId !== incident._id && handleUrgencyToggle(incident._id, incident.urgency)}
-            style={{ cursor: updatingField?.incidentId === incident._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.incidentId !== incident.id && handleUrgencyToggle(incident.id, incident.urgency)}
+            style={{ cursor: updatingField?.incidentId === incident.id ? 'not-allowed' : 'pointer' }}
             title="Click to toggle urgency"
           >
             <Badge
-              bg={incident.urgency ? 'danger' : 'secondary'}
+              bg={isUrgent(incident.urgency) ? 'danger' : 'secondary'}
               className="d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.incidentId === incident._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.incidentId === incident.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.incidentId === incident._id && updatingField.field === 'urgency' ? (
+              {updatingField?.incidentId === incident.id && updatingField.field === 'urgency' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   <span className="small">...</span>
                 </>
               ) : (
                 <>
-                  {incident.urgency ? 'URGENT' : 'NORMAL'}
+                  {isUrgent(incident.urgency) ? 'URGENT' : 'NORMAL'}
                   <IconifyIcon icon="solar:refresh-linear" width={12} height={12} />
                 </>
               )}
@@ -416,19 +279,19 @@ const IncidentsPage = () => {
         width: 150,
         render: (incident) => (
           <div
-            onClick={() => updatingField?.incidentId !== incident._id && handleStatusToggle(incident._id, incident.status)}
-            style={{ cursor: updatingField?.incidentId === incident._id ? 'not-allowed' : 'pointer' }}
+            onClick={() => updatingField?.incidentId !== incident.id && handleStatusToggle(incident.id, incident.status)}
+            style={{ cursor: updatingField?.incidentId === incident.id ? 'not-allowed' : 'pointer' }}
             title="Click to cycle status"
           >
             <Badge
               bg={getStatusVariant(incident.status)}
               className="text-capitalize d-inline-flex align-items-center gap-1"
               style={{
-                cursor: updatingField?.incidentId === incident._id ? 'not-allowed' : 'pointer',
+                cursor: updatingField?.incidentId === incident.id ? 'not-allowed' : 'pointer',
                 transition: 'all 0.2s ease'
               }}
             >
-              {updatingField?.incidentId === incident._id && updatingField.field === 'status' ? (
+              {updatingField?.incidentId === incident.id && updatingField.field === 'status' ? (
                 <>
                   <span className="spinner-border spinner-border-sm" role="status" />
                   Updating...
@@ -458,10 +321,10 @@ const IncidentsPage = () => {
         )
       },
       {
-        key: 'resolved_at',
-        header: 'Resolved',
+        key: 'due_at',
+        header: 'Due Date',
         width: 160,
-        render: (incident) => formatDate(incident.resolved_at)
+        render: (incident) => formatDate(incident.due_at)
       },
       {
         key: 'created_at',
@@ -518,8 +381,8 @@ const IncidentsPage = () => {
             title="All Incidents"
             description="Track and manage incident reports from calls and staff reports."
             columns={columns}
-            data={paginatedIncidents}
-            rowKey={(incident) => incident._id}
+            data={incidents}
+            rowKey={(incident) => incident.id}
             loading={loading}
             error={error}
             onRetry={fetchIncidents}
@@ -537,13 +400,13 @@ const IncidentsPage = () => {
             pagination={{
               currentPage,
               pageSize,
-              totalRecords,
+              totalRecords: total,
               totalPages,
               onPageChange: setCurrentPage,
               onPageSizeChange: setPageSize,
               pageSizeOptions: [10, 25, 50],
               startRecord: startIndex + 1,
-              endRecord: Math.min(startIndex + pageSize, totalRecords)
+              endRecord: Math.min(startIndex + pageSize, total)
             }}
             emptyState={{
               title: 'No incidents found',
@@ -564,7 +427,7 @@ const IncidentsPage = () => {
               <Row className="g-3 mb-3">
                 <Col md={6}>
                   <label className="text-muted small">Incident ID</label>
-                  <div className="fw-medium font-monospace small">{selectedIncident._id}</div>
+                  <div className="fw-medium font-monospace small">{selectedIncident.id}</div>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Call ID</label>
@@ -574,23 +437,23 @@ const IncidentsPage = () => {
                   <label className="text-muted small">Urgency</label>
                   <div>
                     <div
-                      onClick={() => handleUrgencyToggle(selectedIncident._id, selectedIncident.urgency)}
+                      onClick={() => handleUrgencyToggle(selectedIncident.id, selectedIncident.urgency)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to toggle"
                     >
                       <Badge
-                        bg={selectedIncident.urgency ? 'danger' : 'secondary'}
+                        bg={isUrgent(selectedIncident.urgency) ? 'danger' : 'secondary'}
                         className="d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.incidentId === selectedIncident._id && updatingField.field === 'urgency' ? (
+                        {updatingField?.incidentId === selectedIncident.id && updatingField.field === 'urgency' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             <span className="small">Updating...</span>
                           </>
                         ) : (
                           <>
-                            {selectedIncident.urgency ? 'URGENT' : 'NORMAL'}
+                            {isUrgent(selectedIncident.urgency) ? 'URGENT' : 'NORMAL'}
                             <IconifyIcon icon="solar:refresh-linear" width={12} height={12} />
                           </>
                         )}
@@ -602,7 +465,7 @@ const IncidentsPage = () => {
                   <label className="text-muted small">Status</label>
                   <div>
                     <div
-                      onClick={() => handleStatusToggle(selectedIncident._id, selectedIncident.status)}
+                      onClick={() => handleStatusToggle(selectedIncident.id, selectedIncident.status)}
                       style={{ cursor: 'pointer', display: 'inline-block' }}
                       title="Click to cycle status"
                     >
@@ -611,7 +474,7 @@ const IncidentsPage = () => {
                         className="text-capitalize d-inline-flex align-items-center gap-1"
                         style={{ cursor: 'pointer' }}
                       >
-                        {updatingField?.incidentId === selectedIncident._id && updatingField.field === 'status' ? (
+                        {updatingField?.incidentId === selectedIncident.id && updatingField.field === 'status' ? (
                           <>
                             <span className="spinner-border spinner-border-sm" role="status" />
                             Updating...
@@ -635,7 +498,7 @@ const IncidentsPage = () => {
                         variant="link"
                         className="p-0 text-decoration-none"
                         onClick={() => {
-                          setEditingRole(selectedIncident._id)
+                          setEditingRole(selectedIncident.id)
                           setRoleValue(selectedIncident.assigned_role || '')
                         }}
                       >
@@ -643,7 +506,7 @@ const IncidentsPage = () => {
                       </Button>
                     )}
                   </label>
-                  {editingRole === selectedIncident._id ? (
+                  {editingRole === selectedIncident.id ? (
                     <div className="d-flex gap-2">
                       <Form.Control
                         size="sm"
@@ -655,10 +518,10 @@ const IncidentsPage = () => {
                       <Button
                         size="sm"
                         variant="success"
-                        onClick={() => handleRoleSave(selectedIncident._id)}
-                        disabled={updatingField?.incidentId === selectedIncident._id}
+                        onClick={() => handleRoleSave(selectedIncident.id)}
+                        disabled={updatingField?.incidentId === selectedIncident.id}
                       >
-                        {updatingField?.incidentId === selectedIncident._id && updatingField.field === 'assigned_role' ? (
+                        {updatingField?.incidentId === selectedIncident.id && updatingField.field === 'assigned_role' ? (
                           <span className="spinner-border spinner-border-sm" role="status" />
                         ) : (
                           <IconifyIcon icon="solar:check-circle-linear" width={16} height={16} />
@@ -676,12 +539,6 @@ const IncidentsPage = () => {
                     <div>{selectedIncident.assigned_role || '—'}</div>
                   )}
                 </Col>
-                {selectedIncident.reported_by && (
-                  <Col md={12}>
-                    <label className="text-muted small">Reported By</label>
-                    <div className="fw-medium">{selectedIncident.reported_by}</div>
-                  </Col>
-                )}
               </Row>
               <hr />
               <div className="mb-3">
@@ -699,8 +556,8 @@ const IncidentsPage = () => {
                   <div>{formatDate(selectedIncident.created_at)}</div>
                 </Col>
                 <Col md={6}>
-                  <label className="text-muted small">Resolved At</label>
-                  <div>{formatDate(selectedIncident.resolved_at)}</div>
+                  <label className="text-muted small">Due Date</label>
+                  <div>{formatDate(selectedIncident.due_at)}</div>
                 </Col>
                 <Col md={12}>
                   <label className="text-muted small">Last Updated</label>

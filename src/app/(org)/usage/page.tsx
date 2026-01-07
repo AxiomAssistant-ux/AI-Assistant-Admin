@@ -8,102 +8,15 @@ import { ApexOptions } from 'apexcharts'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
-
-type UsageData = {
-  current_period: {
-    start_date: string
-    end_date: string
-    calls_made: number
-    minutes_used: number
-    minutes_allocated: number
-    overage_minutes: number
-  }
-  plan: {
-    plan_id: string
-    name: string
-    tier: string
-    billing_frequency: string
-  }
-  billing: {
-    current_amount: number
-    currency: string
-    next_billing_date: string
-    payment_method: string
-    stripe_customer_id?: string
-    stripe_subscription_id?: string
-  }
-  usage_history: {
-    date: string
-    calls: number
-    minutes: number
-  }[]
-  alerts: {
-    type: 'warning' | 'danger' | 'info'
-    message: string
-  }[]
-}
-
-const MOCK_USAGE_DATA: UsageData = {
-  current_period: {
-    start_date: '2024-12-01T00:00:00Z',
-    end_date: '2024-12-31T23:59:59Z',
-    calls_made: 3420,
-    minutes_used: 8750,
-    minutes_allocated: 10000,
-    overage_minutes: 0
-  },
-  plan: {
-    plan_id: 'pro',
-    name: 'Pro Plan',
-    tier: 'pro',
-    billing_frequency: 'monthly'
-  },
-  billing: {
-    current_amount: 149.00,
-    currency: 'USD',
-    next_billing_date: '2025-01-01T00:00:00Z',
-    payment_method: 'card_ending_4242',
-    stripe_customer_id: 'cus_abc123xyz',
-    stripe_subscription_id: 'sub_def456uvw'
-  },
-  usage_history: [
-    { date: '2024-12-01', calls: 95, minutes: 245 },
-    { date: '2024-12-02', calls: 102, minutes: 268 },
-    { date: '2024-12-03', calls: 88, minutes: 221 },
-    { date: '2024-12-04', calls: 110, minutes: 295 },
-    { date: '2024-12-05', calls: 125, minutes: 318 },
-    { date: '2024-12-06', calls: 98, minutes: 250 },
-    { date: '2024-12-07', calls: 105, minutes: 278 },
-    { date: '2024-12-08', calls: 115, minutes: 302 },
-    { date: '2024-12-09', calls: 92, minutes: 235 },
-    { date: '2024-12-10', calls: 118, minutes: 310 },
-    { date: '2024-12-11', calls: 108, minutes: 285 },
-    { date: '2024-12-12', calls: 95, minutes: 248 },
-    { date: '2024-12-13', calls: 122, minutes: 325 },
-    { date: '2024-12-14', calls: 100, minutes: 260 },
-    { date: '2024-12-15', calls: 112, minutes: 295 },
-    { date: '2024-12-16', calls: 105, minutes: 275 },
-    { date: '2024-12-17', calls: 128, minutes: 338 },
-    { date: '2024-12-18', calls: 115, minutes: 298 },
-    { date: '2024-12-19', calls: 110, minutes: 287 },
-  ],
-  alerts: [
-    {
-      type: 'warning',
-      message: 'You have used 87.5% of your monthly minute allocation'
-    },
-    {
-      type: 'info',
-      message: 'Your subscription will renew on January 1, 2025'
-    }
-  ]
-}
+import { usageApi, type UsageOverviewResponse } from '@/api/org/usage'
+import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 
 const UsageAndBillingPage = () => {
+  useFeatureGuard()
   const { token, user, isAuthenticated } = useAuth()
   const isAdmin = Boolean(isAuthenticated && user?.role === 'admin')
 
-  const [usageData, setUsageData] = useState<UsageData>(MOCK_USAGE_DATA)
+  const [usageData, setUsageData] = useState<UsageOverviewResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
@@ -115,10 +28,11 @@ const UsageAndBillingPage = () => {
     setLoading(true)
     setError(null)
     try {
-      await new Promise(resolve => setTimeout(resolve, 500))
-      setUsageData(MOCK_USAGE_DATA)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Unable to load usage data.')
+      const response = await usageApi.getOverview()
+      setUsageData(response)
+    } catch (err: any) {
+      setError(err?.response?.data?.detail || err?.message || 'Unable to load usage data.')
+      toast.error('Failed to load usage data')
     } finally {
       setLoading(false)
     }
@@ -141,6 +55,28 @@ const UsageAndBillingPage = () => {
       style: 'currency',
       currency: currency
     }).format(amount)
+  }
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Loading...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (error) {
+    return (
+      <div className="alert alert-danger" role="alert">
+        {error}
+      </div>
+    )
+  }
+
+  if (!usageData) {
+    return null
   }
 
   const minutesUsagePercent = (usageData.current_period.minutes_used / usageData.current_period.minutes_allocated) * 100
@@ -235,24 +171,6 @@ const UsageAndBillingPage = () => {
       case 'info': return 'info'
       default: return 'secondary'
     }
-  }
-
-  if (loading) {
-    return (
-      <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '400px' }}>
-        <div className="spinner-border text-primary" role="status">
-          <span className="visually-hidden">Loading...</span>
-        </div>
-      </div>
-    )
-  }
-
-  if (error) {
-    return (
-      <div className="alert alert-danger" role="alert">
-        {error}
-      </div>
-    )
   }
 
   return (

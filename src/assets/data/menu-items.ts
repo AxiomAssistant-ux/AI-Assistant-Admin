@@ -94,6 +94,12 @@ export const PLATFORM_MENU_ITEMS: MenuItemType[] = [
     url: '/appointments',
   },
   {
+    key: 'orders',
+    label: 'Orders',
+    icon: 'solar:calendar-outline',
+    url: '/orders',
+  },
+  {
     key: 'knowledge-base',
     label: 'Knowledge Bases',
     icon: 'solar:book-outline',
@@ -137,6 +143,18 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     url: '/dashboards',
   },
   {
+    key: 'users-roles',
+    label: 'Users and Roles',
+    icon: 'solar:users-group-rounded-outline',
+    url: '/users-roles',
+  },
+  {
+    key: 'complaints',
+    label: 'Complaints',
+    icon: 'solar:danger-triangle-linear',
+    url: '/complaints',
+  },
+  {
     key: 'call-records',
     label: 'Call Records',
     icon: 'solar:call-chat-outline',
@@ -146,7 +164,13 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     key: 'action-items',
     label: 'Action Items',
     icon: 'solar:checklist-outline',
-    url: '/actions-items',
+    url: '/action-items',
+  },
+  {
+    key: 'orders',
+    label: 'Orders',
+    icon: 'solar:box-linear',
+    url: '/orders',
   },
   {
     key: 'incident-reports',
@@ -159,6 +183,12 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     label: 'Appointments',
     icon: 'solar:calendar-outline',
     url: '/appointments',
+  },
+  {
+    key: 'locations',
+    label: 'Locations',
+    icon: 'solar:map-outline',
+    url: '/locations',
   },
   {
     key: 'knowledge-base',

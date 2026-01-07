@@ -5,12 +5,14 @@ import AppMenu from './components/AppMenu'
 import SimplebarReactClient from '@/components/wrapper/SimplebarReactClient'
 import LogoBox from '@/components/wrapper/LogoBox'
 import { useAuth } from '@/context/useAuthContext'
-import { getMenuItems } from '@/helpers/Manu'
+import { getAccessibleMenuItems } from '@/helpers/Manu'
 
 const Page = () => {
   const { user } = useAuth()
 
-  const menuItems = getMenuItems(user?.actor ?? null)
+  // const menuItems = getMenuItems(user?.actor ?? null)
+  const menuItems = getAccessibleMenuItems(user?.actor ?? null, user)
+
 
   return (
     <div className="app-sidebar">

@@ -5,6 +5,8 @@ import {
 } from '@/assets/data/menu-items'
 import type { MenuItemType } from '@/types/menu'
 import type { ActorType } from '@/types/auth'
+import { PAGE_FEATURES } from '@/config/page-features'
+
 
 /* ================================
    MENU SELECTOR
@@ -75,4 +77,35 @@ export const findMenuItem = (
     }
   }
   return null
+}
+
+export const getAccessibleMenuItems = (
+  actor: ActorType | null | undefined,
+  user?: {
+    is_admin?: boolean
+    features?: string[]
+  }
+): MenuItemType[] => {
+  const menuItems = getMenuItems(actor)
+
+  // No user → no menu
+  if (!user) return []
+
+  return menuItems.filter(item => {
+    // Always show menu titles
+    if (item.isTitle) return true
+
+    // Admin sees everything
+    if (user.is_admin) return true
+
+    // No URL → safe to show
+    if (!item.url) return true
+
+    const requiredFeature = PAGE_FEATURES[item.url]
+
+    // No feature mapping → public item
+    if (!requiredFeature) return true
+
+    return user.features?.includes(requiredFeature)
+  })
 }
