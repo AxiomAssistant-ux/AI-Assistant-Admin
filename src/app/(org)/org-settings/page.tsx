@@ -376,3 +376,5 @@ const OrganizationSettingsPage = () => {
 }
 
 export default OrganizationSettingsPage
+
+export const dynamic = 'force-dynamic'

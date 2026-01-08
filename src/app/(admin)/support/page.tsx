@@ -802,3 +802,6 @@ const AdminSupportTicketsPage = () => {
 }
 
 export default AdminSupportTicketsPage
+
+
+export const dynamic = 'force-dynamic'

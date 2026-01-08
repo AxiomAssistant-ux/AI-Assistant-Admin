@@ -1253,3 +1253,4 @@ const formatLanguageLabel = (code?: string) => {
 
 export default AgentsPage
 
+export const dynamic = 'force-dynamic'

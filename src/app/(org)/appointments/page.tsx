@@ -504,3 +504,6 @@ const AppointmentsPage = () => {
 }
 
 export default AppointmentsPage
+
+
+export const dynamic = 'force-dynamic'

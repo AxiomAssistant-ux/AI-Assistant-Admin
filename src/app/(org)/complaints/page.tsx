@@ -1170,3 +1170,6 @@ const ComplaintsPage = () => {
 }
 
 export default ComplaintsPage
+
+
+export const dynamic = 'force-dynamic'

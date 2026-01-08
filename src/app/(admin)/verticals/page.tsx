@@ -728,3 +728,6 @@ const VerticalsPage = () => {
 }
 
 export default VerticalsPage
+
+
+export const dynamic = 'force-dynamic'

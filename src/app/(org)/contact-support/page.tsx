@@ -619,3 +619,5 @@ const ContactSupportPage = () => {
 }
 
 export default ContactSupportPage
+
+export const dynamic = 'force-dynamic'

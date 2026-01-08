@@ -500,3 +500,4 @@ const CreateAgentPage = () => {
 
 export default CreateAgentPage
 
+export const dynamic = 'force-dynamic'

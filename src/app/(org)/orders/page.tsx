@@ -709,3 +709,6 @@ const OrdersPage = () => {
 }
 
 export default OrdersPage
+
+
+export const dynamic = 'force-dynamic'

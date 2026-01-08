@@ -461,3 +461,5 @@ const CreateOrganizationPage = () => {
 }
 
 export default CreateOrganizationPage
+
+export const dynamic = 'force-dynamic'

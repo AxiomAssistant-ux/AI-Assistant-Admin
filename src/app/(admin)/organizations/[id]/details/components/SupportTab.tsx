@@ -624,3 +624,5 @@ const SupportTab: React.FC<SupportTabProps> = ({ organization, onRefresh }) => {
 }
 
 export default SupportTab
+
+export const dynamic = 'force-dynamic'

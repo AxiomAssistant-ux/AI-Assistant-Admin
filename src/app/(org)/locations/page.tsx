@@ -781,3 +781,6 @@ store_number,store_location
 }
 
 export default LocationsPage
+
+
+export const dynamic = 'force-dynamic'

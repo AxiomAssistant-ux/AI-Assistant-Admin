@@ -897,3 +897,6 @@ const AgentPage = () => {
 }
 
 export default AgentPage
+
+
+export const dynamic = 'force-dynamic'

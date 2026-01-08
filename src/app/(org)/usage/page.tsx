@@ -593,3 +593,6 @@ const UsageAndBillingPage = () => {
 }
 
 export default UsageAndBillingPage
+
+
+export const dynamic = 'force-dynamic'

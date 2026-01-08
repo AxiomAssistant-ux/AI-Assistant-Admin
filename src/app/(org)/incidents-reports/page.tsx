@@ -578,3 +578,6 @@ const IncidentsPage = () => {
 }
 
 export default IncidentsPage
+
+
+export const dynamic = 'force-dynamic'

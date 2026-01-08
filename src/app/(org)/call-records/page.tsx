@@ -1030,3 +1030,6 @@ const CallRecordsPage = () => {
 }
 
 export default CallRecordsPage
+
+
+export const dynamic = 'force-dynamic'

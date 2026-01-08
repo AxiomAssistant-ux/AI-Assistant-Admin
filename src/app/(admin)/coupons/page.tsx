@@ -871,3 +871,4 @@ const CouponManagementPage = () => {
 
 export default CouponManagementPage
 
+export const dynamic = 'force-dynamic'

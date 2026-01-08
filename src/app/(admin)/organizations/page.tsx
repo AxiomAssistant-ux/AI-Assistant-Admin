@@ -403,3 +403,5 @@ const OrganizationsPage = () => {
 }
 
 export default OrganizationsPage
+
+export const dynamic = 'force-dynamic'

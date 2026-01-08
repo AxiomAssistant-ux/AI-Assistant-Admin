@@ -340,3 +340,5 @@ const AgentsTab: React.FC<AgentsTabProps> = ({ organization, onRefresh }) => {
 }
 
 export default AgentsTab
+
+export const dynamic = 'force-dynamic'

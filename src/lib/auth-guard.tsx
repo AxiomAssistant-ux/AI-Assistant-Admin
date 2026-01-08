@@ -75,3 +75,6 @@ export default function AuthGuard({
   return <>{children}</>
 }
 
+
+
+export const dynamic = 'force-dynamic'

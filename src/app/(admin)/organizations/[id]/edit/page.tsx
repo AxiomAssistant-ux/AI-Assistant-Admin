@@ -626,3 +626,5 @@ const EditOrganizationPage = () => {
 }
 
 export default EditOrganizationPage
+
+export const dynamic = 'force-dynamic'

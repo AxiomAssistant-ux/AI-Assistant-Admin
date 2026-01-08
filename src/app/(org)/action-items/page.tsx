@@ -1156,3 +1156,6 @@ const ActionItemsPage = () => {
 }
 
 export default ActionItemsPage
+
+
+export const dynamic = 'force-dynamic'

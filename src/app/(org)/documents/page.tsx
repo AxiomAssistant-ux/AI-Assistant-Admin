@@ -719,3 +719,4 @@ const DocumentsPage = () => {
 
 export default DocumentsPage
 
+export const dynamic = 'force-dynamic'

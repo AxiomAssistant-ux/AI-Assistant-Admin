@@ -264,3 +264,5 @@ const OrganizationDetailsPage = () => {
 }
 
 export default OrganizationDetailsPage
+
+export const dynamic = 'force-dynamic'

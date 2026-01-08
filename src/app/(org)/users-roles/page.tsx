@@ -1068,3 +1068,5 @@ const UserManagementPage = () => {
 }
 
 export default UserManagementPage
+
+export const dynamic = 'force-dynamic'

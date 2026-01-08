@@ -729,3 +729,6 @@ const SubscriptionPlansPage = () => {
 
 export default SubscriptionPlansPage
 
+
+
+export const dynamic = 'force-dynamic'
