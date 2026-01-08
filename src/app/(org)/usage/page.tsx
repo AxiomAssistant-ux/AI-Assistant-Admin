@@ -1,17 +1,22 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
+// export const dynamic = 'force-dynamic'
 
 import React, { useCallback, useEffect, useState } from 'react'
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Col, Modal, Row } from 'react-bootstrap'
 import Link from 'next/link'
-import ReactApexChart from 'react-apexcharts'
+// import ReactApexChart from 'react-apexcharts'
 import { ApexOptions } from 'apexcharts'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
 import { usageApi, type UsageOverviewResponse } from '@/api/org/usage'
 import { useFeatureGuard } from '@/hooks/useFeatureGuard'
+import dynamic from 'next/dynamic'
+
+const ReactApexChart = dynamic(() => import('react-apexcharts'), {
+  ssr: false,
+})
 
 const UsageAndBillingPage = () => {
   useFeatureGuard()

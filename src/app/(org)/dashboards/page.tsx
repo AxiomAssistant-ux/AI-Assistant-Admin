@@ -1,19 +1,23 @@
 'use client'
 
-export const dynamic = 'force-dynamic'
-
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { Row, Col, Card, CardBody, CardHeader, CardTitle, Spinner, Alert, Badge, Button, ButtonGroup } from 'react-bootstrap'
 import Link from 'next/link'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { ApexOptions } from 'apexcharts'
-import ReactApexChart from 'react-apexcharts'
+// import ReactApexChart from 'react-apexcharts'
 import { analyticsApi, type DashboardResponse, type AnalyticsPeriod } from '@/api/org/analytics'
 import { actionItemsApi } from '@/api/org/action-items'
 import { appointmentsApi } from '@/api/org/appointments'
 import { ordersApi } from '@/api/org/orders'
 import { orgUsersApi } from '@/api/org/users'
 import { supportApi } from '@/api/org/support'
+import dynamic from 'next/dynamic'
+
+const ReactApexChart = dynamic(() => import('react-apexcharts'), {
+  ssr: false,
+})
+
 
 type PeriodOption = {
   value: AnalyticsPeriod
@@ -42,7 +46,7 @@ const DashboardPage = () => {
     loadDashboardData()
   }, [period])
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = useCallback(async () => {
     try {
       setLoading(true)
       setError(null)
@@ -68,7 +72,7 @@ const DashboardPage = () => {
     } finally {
       setLoading(false)
     }
-  }
+  },[])
 
   // Calls Over Time Chart
   const callsOverTimeChart: ApexOptions = useMemo(() => ({
