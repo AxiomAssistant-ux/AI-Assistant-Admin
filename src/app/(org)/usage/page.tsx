@@ -1,5 +1,7 @@
 'use client'
 
+export const dynamic = 'force-dynamic'
+
 import React, { useCallback, useEffect, useState } from 'react'
 import { Badge, Button, Card, CardBody, CardHeader, CardTitle, Col, Modal, Row } from 'react-bootstrap'
 import Link from 'next/link'
@@ -595,4 +597,3 @@ const UsageAndBillingPage = () => {
 export default UsageAndBillingPage
 
 
-export const dynamic = 'force-dynamic'
