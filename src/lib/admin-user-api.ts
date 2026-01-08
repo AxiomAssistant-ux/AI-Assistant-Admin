@@ -1,6 +1,6 @@
 import { apiClient } from './api-client'
 import type { AdminUserCreatePayload, AdminUserQueryParams, AdminUserUpdatePayload } from '@/types/admin-user'
-import type { AdminUserListResponse, UserOut } from '@/types/auth'
+import type { UserOut } from '@/types/auth'
 
 const buildQueryString = (params: AdminUserQueryParams = {}) => {
   const query = new URLSearchParams()
@@ -18,7 +18,8 @@ const buildQueryString = (params: AdminUserQueryParams = {}) => {
 export const adminUserApi = {
   async listUsers(token: string, params: AdminUserQueryParams = {}) {
     const endpoint = `/auth/admin/users${buildQueryString(params)}`
-    return apiClient.get<AdminUserListResponse>(endpoint, token)
+    // return apiClient.get<AdminUserListResponse>(endpoint, token)
+    return apiClient.get<UserOut[]>(endpoint, token)
   },
 
   async createUser(token: string, payload: AdminUserCreatePayload) {

@@ -88,7 +88,7 @@ const OrdersPage = () => {
     }
   }, [currentPage, totalPages])
 
-  const handleStatusToggle = async (orderId: string, currentStatus: Order['status']) => {
+  const handleStatusToggle = useCallback(async (orderId: string, currentStatus: Order['status']) => {
     const statusFlow: Record<Order['status'], Order['status']> = {
       pending: 'in_progress',
       in_progress: 'completed',
@@ -115,9 +115,9 @@ const OrdersPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  }
+  },[])
 
-  const handleUrgencyToggle = async (orderId: string, currentUrgency: boolean) => {
+  const handleUrgencyToggle = useCallback(async (orderId: string, currentUrgency: boolean) => {
     setUpdatingField({ orderId, field: 'urgency' })
     try {
       await ordersApi.update(orderId, { urgency: !currentUrgency })
@@ -136,7 +136,7 @@ const OrdersPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  }
+  },[])
 
   const handleDeliverySave = async (orderId: string) => {
     if (!deliveryValue) {
@@ -409,7 +409,7 @@ const OrdersPage = () => {
         )
       }
     ],
-    [updatingField, startIndex]
+    [updatingField, startIndex, handleStatusToggle, handleUrgencyToggle]
   )
 
   return (

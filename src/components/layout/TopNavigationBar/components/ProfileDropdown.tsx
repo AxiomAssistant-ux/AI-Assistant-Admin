@@ -34,7 +34,7 @@ const ProfileDropdown = () => {
       </DropdownToggle>
       <DropdownMenu className=" dropdown-menu-end">
         <DropdownHeader>
-          <div className="mb-0 fw-medium">{user?.username || 'User'}</div>
+          <div className="mb-0 fw-medium">{user?.name || 'User'}</div>
           <small className="text-muted">{user?.email || 'user@example.com'}</small>
           {user?.role && (
             <div>

@@ -1,6 +1,6 @@
 import { StaticImageData } from 'next/image'
 import { BootstrapVariantType } from './component-props'
-import { UserType } from './auth'
+import { UserOut } from './auth'
 
 export type IdType = string
 
@@ -8,10 +8,10 @@ export type EmailLabelType = 'Primary' | 'Social' | 'Promotions' | 'Updates' | '
 
 export type EmailType = {
   id: IdType
-  fromId: UserType['id']
-  from?: UserType
-  toId: UserType['id']
-  to?: UserType
+  fromId: UserOut['id']
+  from?: UserOut
+  toId: UserOut['id']
+  to?: UserOut
   subject?: string
   content?: string
   attachments?: FileType[]
@@ -101,8 +101,8 @@ export type PropertyType = {
 export type CustomerType = {
   id: IdType
   propertyType: string
-  // userId: UserType['id']
-  // user?: UserType
+  // userId: UserOut['id']
+  // user?: UserOut
   interestedProperties: string
   customerStatus: 'Interested' | 'Under Review' | 'Follow-up'
   date: Date
@@ -115,8 +115,8 @@ export type CustomerType = {
 export type CustomerReviewsType = {
   id: IdType
   rating: number
-  // userId: UserType['id']
-  // user?: UserType
+  // userId: UserOut['id']
+  // user?: UserOut
   propertyId: PropertyType['id']
   property?: PropertyType
   review: {
@@ -127,7 +127,7 @@ export type CustomerReviewsType = {
   date: Date
 }
 
-// export type SocialUserType = {
+// export type SocialUserOut = {
 //   id: IdType
 //   avatar: StaticImageData
 //   name: string

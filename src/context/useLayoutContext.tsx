@@ -41,27 +41,27 @@ const LayoutProvider = ({ children }: ChildrenType) => {
   })
 
   // update settings
-  const updateSettings = (_newSettings: Partial<LayoutState>) => setSettings({ ...settings, ..._newSettings })
+  const updateSettings = useCallback((_newSettings: Partial<LayoutState>) => setSettings(prev => ({ ...prev, ..._newSettings })), [setSettings])
 
   // update theme mode
-  const changeTheme = (newTheme: ThemeType) => {
+  const changeTheme = useCallback((newTheme: ThemeType) => {
     updateSettings({ theme: newTheme })
-  }
+  }, [updateSettings])
 
   // change topbar theme
-  const changeTopbarTheme = (newTheme: ThemeType) => {
+  const changeTopbarTheme = useCallback((newTheme: ThemeType) => {
     updateSettings({ topbarTheme: newTheme })
-  }
+  }, [updateSettings])
 
   // change menu theme
-  const changeMenuTheme = (newTheme: MenuType['theme']) => {
-    updateSettings({ menu: { ...settings.menu, theme: newTheme } })
-  }
+  const changeMenuTheme = useCallback((newTheme: MenuType['theme']) => {
+    setSettings(prev => ({ ...prev, menu: { ...prev.menu, theme: newTheme } }))
+  }, [setSettings])
 
   // change menu theme
-  const changeMenuSize = (newSize: MenuType['size']) => {
+  const changeMenuSize = useCallback((newSize: MenuType['size']) => {
     // Does nothing now
-  }
+  }, [])
 
   // toggle theme customizer offcanvas
   const toggleThemeCustomizer: OffcanvasControlType['toggle'] = () => {
@@ -86,10 +86,15 @@ const LayoutProvider = ({ children }: ChildrenType) => {
   // toggle backdrop
   const toggleBackdrop = useCallback(() => {
     const htmlTag = document.getElementsByTagName('html')[0]
-    if (offcanvasStates.showBackdrop) htmlTag.classList.remove('sidebar-enable')
-    else htmlTag.classList.add('sidebar-enable')
-    setOffcanvasStates({ ...offcanvasStates, showBackdrop: !offcanvasStates.showBackdrop })
-  }, [offcanvasStates.showBackdrop])
+    setOffcanvasStates(prevStates => {
+      if (prevStates.showBackdrop) {
+        htmlTag.classList.remove('sidebar-enable')
+      } else {
+        htmlTag.classList.add('sidebar-enable')
+      }
+      return { ...prevStates, showBackdrop: !prevStates.showBackdrop }
+    })
+  }, [])
 
   useEffect(() => {
     toggleDocumentAttribute('data-bs-theme', settings.theme)
@@ -104,7 +109,7 @@ const LayoutProvider = ({ children }: ChildrenType) => {
     }
   }, [settings])
 
-  const resetSettings = () => updateSettings(INIT_STATE)
+  const resetSettings = useCallback(() => setSettings(INIT_STATE), [INIT_STATE, setSettings])
 
   return (
     <ThemeContext.Provider
@@ -123,7 +128,18 @@ const LayoutProvider = ({ children }: ChildrenType) => {
           toggleBackdrop,
           resetSettings,
         }),
-        [settings, offcanvasStates],
+        [
+          settings,
+          offcanvasStates,
+          changeTheme,
+          changeTopbarTheme,
+          changeMenuTheme,
+          changeMenuSize,
+          themeCustomizer,
+          activityStream,
+          toggleBackdrop,
+          resetSettings,
+        ],
       )}>
       {children}
       {offcanvasStates.showBackdrop && <div className="offcanvas-backdrop fade show" onClick={toggleBackdrop} />}

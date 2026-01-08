@@ -312,7 +312,7 @@ const VerticalsPage = () => {
     }
   }
 
-  const handleToggleEnabled = async (vertical: Vertical) => {
+  const handleToggleEnabled = useCallback(async (vertical: Vertical) => {
     if (!token || !isAdmin) return
     setTogglingId(vertical._id)
     try {
@@ -334,7 +334,7 @@ const VerticalsPage = () => {
     } finally {
       setTogglingId(null)
     }
-  }
+  },[])
 
   const handleModuleToggle = (module: ModuleType) => {
     setFormState(prev => ({
@@ -463,7 +463,7 @@ const VerticalsPage = () => {
         )
       }
     ],
-    [togglingId, openViewModal, openEditModal, confirmDelete]
+    [togglingId, openViewModal, openEditModal, confirmDelete, handleToggleEnabled]
   )
 
   return (

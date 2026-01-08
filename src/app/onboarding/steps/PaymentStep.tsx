@@ -76,7 +76,7 @@ const PaymentStep = () => {
           </div>
           <h4 className="fw-bold text-dark mb-2">Start your free trial</h4>
           <p className="text-muted">
-            Your card won't be charged until after your 14-day trial
+            Your card will not be charged until after your 14-day trial
           </p>
         </div>
 

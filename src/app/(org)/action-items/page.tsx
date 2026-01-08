@@ -131,10 +131,10 @@ const ActionItemsPage = () => {
     }
   }
 
-  const handleConfirmAppointment = async (item: ActionItem) => {
+  const handleConfirmAppointment = useCallback(async (item: ActionItem) => {
     setConfirmingItem(item)
     setCallLogData(null)
-    
+
     if (item.call_id) {
       const callLog = await loadCallLogData(item.call_id)
       if (callLog) {
@@ -153,14 +153,14 @@ const ActionItemsPage = () => {
         scheduled_at: item.due_at ? new Date(item.due_at).toISOString().slice(0, 16) : ''
       })
     }
-    
-    setConfirmAppointmentModalOpen(true)
-  }
 
-  const handleConfirmOrder = async (item: ActionItem) => {
+    setConfirmAppointmentModalOpen(true)
+  },[])
+
+  const handleConfirmOrder = useCallback(async (item: ActionItem) => {
     setConfirmingItem(item)
     setCallLogData(null)
-    
+
     if (item.call_id) {
       const callLog = await loadCallLogData(item.call_id)
       if (callLog) {
@@ -187,13 +187,13 @@ const ActionItemsPage = () => {
         special_instructions: ''
       })
     }
-    
+
     setConfirmOrderModalOpen(true)
-  }
+  },[])
 
   const submitAppointment = async () => {
     if (!confirmingItem) return
-    
+
     if (!appointmentForm.customer_name || !appointmentForm.customer_phone || !appointmentForm.scheduled_at) {
       toast.error('Please fill in all required fields')
       return
@@ -210,10 +210,10 @@ const ActionItemsPage = () => {
       }
 
       await appointmentsApi.create(appointmentData)
-      
+
       // Mark action item as completed
       await actionItemsApi.update(confirmingItem.id, { status: 'completed' })
-      
+
       toast.success('Appointment created successfully!')
       setConfirmAppointmentModalOpen(false)
       setConfirmingItem(null)
@@ -233,7 +233,7 @@ const ActionItemsPage = () => {
 
   const submitOrder = async () => {
     if (!confirmingItem) return
-    
+
     if (!orderForm.customer_name || !orderForm.customer_phone || !orderForm.order_details) {
       toast.error('Please fill in all required fields')
       return
@@ -256,10 +256,10 @@ const ActionItemsPage = () => {
       }
 
       await ordersApi.create(orderData)
-      
+
       // Mark action item as completed
       await actionItemsApi.update(confirmingItem.id, { status: 'completed' })
-      
+
       toast.success('Order created successfully!')
       setConfirmOrderModalOpen(false)
       setConfirmingItem(null)
@@ -281,7 +281,7 @@ const ActionItemsPage = () => {
     }
   }
 
-  const handleStatusToggle = async (itemId: string, currentStatus: ActionItem['status']) => {
+  const handleStatusToggle = useCallback(async (itemId: string, currentStatus: ActionItem['status']) => {
     const statusFlow: Record<ActionItem['status'], ActionItem['status']> = {
       pending: 'in_progress',
       in_progress: 'completed',
@@ -293,45 +293,45 @@ const ActionItemsPage = () => {
     setUpdatingField({ itemId, field: 'status' })
     try {
       await actionItemsApi.update(itemId, { status: newStatus })
-      
+
       setActionItems(prev => prev.map(item =>
         item.id === itemId ? { ...item, status: newStatus, updated_at: new Date().toISOString() } : item
       ))
-      
+
       if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, status: newStatus, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success('Status updated successfully')
     } catch (err) {
       toast.error('Failed to update status')
     } finally {
       setUpdatingField(null)
     }
-  }
+  }, [selectedItem])
 
-  const handleUrgencyToggle = async (itemId: string, currentUrgency: ActionItem['urgency']) => {
+  const handleUrgencyToggle = useCallback(async (itemId: string, currentUrgency: ActionItem['urgency']) => {
     const newUrgency = (currentUrgency === 'high' || currentUrgency === 'critical') ? 'low' : 'high'
-    
+
     setUpdatingField({ itemId, field: 'urgency' })
     try {
       await actionItemsApi.update(itemId, { urgency: newUrgency })
-      
+
       setActionItems(prev => prev.map(item =>
         item.id === itemId ? { ...item, urgency: newUrgency, updated_at: new Date().toISOString() } : item
       ))
-      
+
       if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, urgency: newUrgency, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success('Urgency updated successfully')
     } catch (err) {
       toast.error('Failed to update urgency')
     } finally {
       setUpdatingField(null)
     }
-  }
+  },[])
 
   const handleDueDateSave = async (itemId: string) => {
     if (!dueDateValue) {
@@ -343,15 +343,15 @@ const ActionItemsPage = () => {
     try {
       const newDueDate = new Date(dueDateValue).toISOString()
       await actionItemsApi.update(itemId, { due_at: newDueDate })
-      
+
       setActionItems(prev => prev.map(item =>
         item.id === itemId ? { ...item, due_at: newDueDate, updated_at: new Date().toISOString() } : item
       ))
-      
+
       if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, due_at: newDueDate, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success('Due date updated successfully')
       setEditingDueDate(null)
     } catch (err) {
@@ -370,15 +370,15 @@ const ActionItemsPage = () => {
     setUpdatingField({ itemId, field: 'assigned_role' })
     try {
       await actionItemsApi.update(itemId, { assigned_role: roleValue.trim() })
-      
+
       setActionItems(prev => prev.map(item =>
         item.id === itemId ? { ...item, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() } : item
       ))
-      
+
       if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, assigned_role: roleValue.trim(), updated_at: new Date().toISOString() })
       }
-      
+
       toast.success('Assigned role updated successfully')
       setEditingRole(null)
     } catch (err) {
@@ -647,7 +647,7 @@ const ActionItemsPage = () => {
         )
       }
     ],
-    [updatingField, startIndex]
+    [updatingField, startIndex, handleStatusToggle]
   )
 
   return (

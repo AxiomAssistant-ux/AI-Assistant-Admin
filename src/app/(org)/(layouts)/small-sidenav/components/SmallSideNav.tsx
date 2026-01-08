@@ -9,7 +9,7 @@ const SmallSideNav = () => {
   useEffect(() => {
     changeMenu.size('condensed')
     route.push('/dashboards')
-  }, [])
+  }, [changeMenu, route])
   return <></>
 }
 

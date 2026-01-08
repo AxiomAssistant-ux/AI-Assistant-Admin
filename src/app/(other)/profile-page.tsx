@@ -4,7 +4,7 @@ import React, { useEffect, useState } from 'react'
 import { Row, Col, Card, CardBody, Form, Button, Alert, Spinner, Tab, Tabs } from 'react-bootstrap'
 import Link from 'next/link'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
-import { orgProfileApi, type UpdateProfileRequest, type ChangePasswordRequest } from '@/api/org/profile'
+import { profileApi, type UpdateProfileRequest, type ChangePasswordRequest } from '@/api/org/profile'
 import { useAuth } from '@/context/useAuthContext'
 import { isOrgUser } from '@/types/auth'
 
@@ -59,7 +59,7 @@ const ProfilePage = () => {
         email: profileData.email,
       }
 
-      await orgProfileApi.updateProfile(updateData)
+      await profileApi.updateMyProfile(updateData)
       await refreshUser() // Refresh user context
       setSuccess('Profile updated successfully!')
 
@@ -94,7 +94,7 @@ const ProfilePage = () => {
         return
       }
 
-      await orgProfileApi.changePassword(passwordData)
+      await profileApi.changePassword(passwordData)
       
       // Clear form
       setPasswordData({

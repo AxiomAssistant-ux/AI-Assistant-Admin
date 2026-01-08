@@ -148,7 +148,7 @@ const LocationsPage = () => {
     }
   }
 
-  const handleDelete = async (locationId: string) => {
+  const handleDelete = useCallback(async (locationId: string) => {
     if (!confirm('Are you sure you want to delete this location?')) return
     
     try {
@@ -159,7 +159,7 @@ const LocationsPage = () => {
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to delete location'
       toast.error(errorMsg)
     }
-  }
+  },[])
 
   // Import handlers
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -385,7 +385,7 @@ const LocationsPage = () => {
         )
       }
     ],
-    [startIndex]
+    [startIndex, handleDelete]
   )
 
   if (!isAuthenticated) {
@@ -547,7 +547,7 @@ const LocationsPage = () => {
                   <li><strong>Supported formats:</strong> PDF, CSV, DOCX, TXT</li>
                   <li><strong>Maximum file size:</strong> 5MB (50 pages for PDF)</li>
                   <li>AI will extract store numbers and addresses automatically</li>
-                  <li>You'll review and edit before saving</li>
+                  <li>You will review and edit before saving</li>
                   <li>Duplicate store numbers will be rejected</li>
                 </ul>
               </Alert>

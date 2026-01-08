@@ -20,21 +20,28 @@ const ChoicesFormInput = ({ children, multiple, className, onChange, allowInput,
   const choicesRef = useRef<HTMLInputElement & HTMLSelectElement>(null)
 
   useEffect(() => {
-    if (choicesRef.current) {
-      const choices = new Choices(choicesRef.current, {
+    const ref = choicesRef.current
+    if (ref) {
+      const choices = new Choices(ref, {
         ...options,
         placeholder: true,
         allowHTML: true,
         shouldSort: false,
       })
-      choices.passedElement.element.addEventListener('change', (e: Event) => {
+      const handleChange = (e: Event) => {
         if (!(e.target instanceof HTMLSelectElement)) return
         if (onChange) {
           onChange(e.target.value)
         }
-      })
+      }
+      ref.addEventListener('change', handleChange)
+
+      return () => {
+        choices.destroy()
+        ref.removeEventListener('change', handleChange)
+      }
     }
-  }, [choicesRef])
+  }, [onChange, options])
 
   return allowInput ? (
     <input ref={choicesRef} multiple={multiple} className={className} {...props} />

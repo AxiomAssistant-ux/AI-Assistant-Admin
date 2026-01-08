@@ -9,7 +9,7 @@ const DarkMode = () => {
   useEffect(() => {
     changeTheme('dark')
     route.push('/dashboards')
-  }, [])
+  }, [changeTheme, route])
   return <></>
 }
 

@@ -12,30 +12,24 @@ import { useActiveCalls } from '@/hooks/useActiveCalls'
  * Displays a real-time badge showing the number of active calls.
  * Shows a pulsing animation when calls are in progress.
  * 
+ * IMPORTANT: This component relies on a parent component having
+ * useRealtimeUpdates() with onActiveCallsUpdated callback.
+ * 
  * Usage in Header:
  * ```tsx
+ * // Parent component must have:
+ * useRealtimeUpdates({
+ *   onActiveCallsUpdated: (data) => console.log(data)
+ * })
+ * 
+ * // Then use badge:
  * <ActiveCallsBadge />
  * ```
  */
 export const ActiveCallsBadge: React.FC = () => {
-  const { activeCallsCount, isLoading, isConnected } = useActiveCalls()
+  const { activeCallsCount } = useActiveCalls()
 
-  // Don't show badge if not connected and no active calls
-  if (!isConnected && activeCallsCount === 0) {
-    return null
-  }
-
-  // Show loading state
-  if (isLoading) {
-    return (
-      <Badge bg="secondary" className="d-flex align-items-center gap-2 px-3 py-2">
-        <Spinner size="sm" animation="border" style={{ width: 14, height: 14 }} />
-        <span className="fw-semibold small">Connecting...</span>
-      </Badge>
-    )
-  }
-
-  // No active calls - show minimal badge
+  // No active calls - show minimal badge or hide
   if (activeCallsCount === 0) {
     return (
       <Badge 

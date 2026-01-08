@@ -79,11 +79,13 @@ function transformOrgUserResponse(response: OrgUserResponse): UserOut {
   return {
     actor: 'org',
     id: response.org_user._id,
+    _id: response.org_user._id,
     email: response.org_user.email,
     name: response.org_user.name,
     org_id: response.org_user.org_id,
     is_admin: response.org_user.is_admin,
     role_name: response.org_user.role_name,
+    role: response.org_user.role_name || '',
     status: response.org_user.status,
     features: response.org_user.features,
     organization: response.organization,
@@ -168,7 +170,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const userResponse = await authApi.getCurrentOrgUser()
       
       // Step 4: Transform to UserOut
-      const userOut = transformOrgUserResponse(userResponse)
+      const userOut = transformOrgUserResponse(userResponse as any)
       
       // Step 5: Save complete auth data to storage
       AUTH_STORAGE.saveAuth(
@@ -187,7 +189,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ Sign In Success:', {
         actor: userOut.actor,
         user: userOut.name,
-        org: userOut.organization.company_name,
+        org: userOut.actor === 'org' ? userOut.organization?.company_name : undefined,
         redirectPath,
       })
 
@@ -247,7 +249,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Only refresh org users for now
       if (user.actor === 'org') {
         const userResponse = await authApi.getCurrentOrgUser()
-        const refreshedUser = transformOrgUserResponse(userResponse)
+        const refreshedUser = transformOrgUserResponse(userResponse as any)
         
         setUser(refreshedUser)
         AUTH_STORAGE.saveAuth(

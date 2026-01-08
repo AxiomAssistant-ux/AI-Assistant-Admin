@@ -1,7 +1,7 @@
 'use client'
 
 import React, { use, useCallback, useEffect, useMemo, useState } from 'react'
-import { Badge, Button, Col, Form, Modal, Row, Spinner} from 'react-bootstrap'
+import { Badge, Button, Col, Form, Modal, Row, Spinner } from 'react-bootstrap'
 import Link from 'next/link'
 import { DataTable } from '@/components/table'
 import type { DataTableColumn, DataTableFilterControl } from '@/components/table'
@@ -51,10 +51,10 @@ const AppointmentsPage = () => {
     setLoading(true)
     setError(null)
     try {
-      const params = {
+      const params: any = {
         skip: (currentPage - 1) * pageSize,
         limit: pageSize,
-        sort: 'newest' as const,
+        sort: 'newest',
       }
 
       if (statusFilter !== 'all') {
@@ -102,7 +102,7 @@ const AppointmentsPage = () => {
     }
   }, [currentPage, totalPages])
 
-  const handleStatusToggle = async (apptId: string, currentStatus: Appointment['status']) => {
+  const handleStatusToggle = useCallback(async (apptId: string, currentStatus: Appointment['status']) => {
     const statusFlow: Record<Appointment['status'], Appointment['status']> = {
       scheduled: 'completed',
       completed: 'cancelled',
@@ -113,22 +113,22 @@ const AppointmentsPage = () => {
     setUpdatingField({ apptId, field: 'status' })
     try {
       await appointmentsApi.update(apptId, { status: newStatus })
-      
+
       setAppointments(prev => prev.map(appt =>
         appt.id === apptId ? { ...appt, status: newStatus, updated_at: new Date().toISOString() } : appt
       ))
-      
+
       if (selectedAppointment && selectedAppointment.id === apptId) {
         setSelectedAppointment({ ...selectedAppointment, status: newStatus, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success('Status updated successfully')
     } catch (err) {
       toast.error('Failed to update status')
     } finally {
       setUpdatingField(null)
     }
-  }
+  }, [selectedAppointment])
 
   const handleScheduleSave = async (apptId: string) => {
     if (!scheduleValue) {
@@ -140,15 +140,15 @@ const AppointmentsPage = () => {
     try {
       const newSchedule = new Date(scheduleValue).toISOString()
       await appointmentsApi.update(apptId, { scheduled_at: newSchedule })
-      
+
       setAppointments(prev => prev.map(appt =>
         appt.id === apptId ? { ...appt, scheduled_at: newSchedule, updated_at: new Date().toISOString() } : appt
       ))
-      
+
       if (selectedAppointment && selectedAppointment.id === apptId) {
         setSelectedAppointment({ ...selectedAppointment, scheduled_at: newSchedule, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success('Schedule updated successfully')
       setEditingSchedule(null)
     } catch (err) {
@@ -300,7 +300,7 @@ const AppointmentsPage = () => {
         )
       }
     ],
-    [updatingField, startIndex]
+    [updatingField, startIndex, handleStatusToggle]
   )
 
   return (

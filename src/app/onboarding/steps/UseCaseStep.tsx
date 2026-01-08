@@ -87,7 +87,7 @@ const UseCaseStep = () => {
               className="text-primary"
             />
           </div>
-          <h4 className="fw-bold text-dark mb-2">What's your primary use case?</h4>
+          <h4 className="fw-bold text-dark mb-2">What is your primary use case?</h4>
           <p className="text-muted">
             Help us tailor the experience to your specific needs
           </p>

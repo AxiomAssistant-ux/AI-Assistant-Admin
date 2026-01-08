@@ -198,7 +198,7 @@ const PricingPlansStep = () => {
         <div className="alert alert-info d-flex align-items-start gap-2 mb-4">
           <IconifyIcon icon="solar:info-circle-bold" width={20} height={20} className="mt-1 flex-shrink-0" />
           <div className="small">
-            <strong>14-day free trial included.</strong> You won't be charged until your trial ends. 
+            <strong>14-day free trial included.</strong> You will not be charged until your trial ends. 
             Cancel anytime during the trial period.
           </div>
         </div>

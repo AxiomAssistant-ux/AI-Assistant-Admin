@@ -490,7 +490,7 @@ const AgentPage = () => {
                                     <div className="text-center py-4">
                                         <IconifyIcon icon="solar:book-linear" width={48} height={48} className="text-muted mb-3" />
                                         <h6 className="text-muted">No Knowledge Bases</h6>
-                                        <p className="text-muted small mb-3">Add knowledge bases to enhance your agent's capabilities</p>
+                                        <p className="text-muted small mb-3">Add knowledge bases to enhance your agent capabilities</p>
                                         <Button
                                             variant="outline-primary"
                                             size="sm"

@@ -4,13 +4,14 @@ import React, { useEffect, useState } from 'react'
 import { Row, Col, Card, CardBody, Form, Button, Alert, Spinner } from 'react-bootstrap'
 import Link from 'next/link'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
-import { orgSettingsApi, type OrganizationSettings, type UpdateOrganizationSettingsRequest } from '@/api/org/settings'
+import { orgSettingsApi, type Organization, type UpdateOrganizationSettingsRequest } from '@/api/org/settings'
 import { useAuth } from '@/context/useAuthContext'
 import { isOrgUser } from '@/types/auth'
+import Image from "next/image"
 
 const OrganizationSettingsPage = () => {
   const { user } = useAuth()
-  const [settings, setSettings] = useState<OrganizationSettings | null>(null)
+  const [settings, setSettings] = useState<Organization | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -214,7 +215,7 @@ const OrganizationSettingsPage = () => {
                   <div className="mb-3">
                     <Form.Label>Logo Preview</Form.Label>
                     <div className="border rounded p-3 bg-light">
-                      <img 
+                      <Image 
                         src={formData.logo_url} 
                         alt="Company Logo" 
                         style={{ maxHeight: '100px', maxWidth: '200px' }}

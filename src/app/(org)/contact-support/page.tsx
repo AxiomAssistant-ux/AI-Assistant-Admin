@@ -347,7 +347,7 @@ const ContactSupportPage = () => {
             <CardBody className="text-center">
               <IconifyIcon icon="solar:letter-linear" width={48} height={48} className="text-primary mb-3" />
               <h5>Email Support</h5>
-              <p className="text-muted small">Send us an email and we'll get back to you within 24 hours.</p>
+              <p className="text-muted small">Send us an email and we will get back to you within 24 hours.</p>
               <div className="fw-semibold mb-2">support@voiceassistant.com</div>
               <a href="mailto:support@voiceassistant.com" className="btn btn-outline-primary btn-sm">
                 <IconifyIcon icon="solar:letter-linear" width={16} height={16} className="me-1" />

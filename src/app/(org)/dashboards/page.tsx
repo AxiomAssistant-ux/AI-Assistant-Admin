@@ -177,7 +177,7 @@ const DashboardPage = () => {
         height: 300,
         type: 'donut'
       },
-      series: Object.values(statuses),
+      series: Object.values(statuses) as number[],
       labels: Object.keys(statuses).map(s => s.replace('_', ' ').toUpperCase()),
       colors: ['#f7b84b', '#4fc6e1', '#1abc9c', '#6c757d'],
       legend: {
@@ -241,7 +241,7 @@ const DashboardPage = () => {
       dataLabels: { enabled: false },
       series: [{
         name: 'Tickets',
-        data: Object.values(types)
+        data: Object.values(types) as number[]
       }],
       xaxis: {
         categories: Object.keys(types).map(t => t.replace('_', ' ').toUpperCase())
@@ -259,7 +259,7 @@ const DashboardPage = () => {
         height: 280,
         type: 'pie'
       },
-      series: Object.values(statuses),
+      series: Object.values(statuses) as any,
       labels: Object.keys(statuses).map(s => s.charAt(0).toUpperCase() + s.slice(1)),
       colors: ['#1abc9c', '#f7b84b', '#f1556c'],
       legend: {

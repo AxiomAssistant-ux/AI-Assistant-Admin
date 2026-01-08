@@ -2,20 +2,13 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { Card, CardBody, Form, Button, Alert } from 'react-bootstrap'
+import { Card, CardBody, Form, Button } from 'react-bootstrap'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 
-interface OrgFormData {
-  companyName: string
-  industry: string
-  logoFile?: FileList
-  primaryColor: string
-  secondaryColor: string
-}
-
+// 1. Define the Schema FIRST
 const schema = yup.object({
   companyName: yup
     .string()
@@ -26,9 +19,14 @@ const schema = yup.object({
   industry: yup
     .string()
     .required('Please select an industry'),
-  primaryColor: yup.string(),
-  secondaryColor: yup.string(),
+  logoUrl: yup.string().default(''), 
+  primaryColor: yup.string().required('Primary color is required'),
+  secondaryColor: yup.string().required('Secondary color is required'),
 }).required()
+
+// 2. Infer the type from the schema. 
+// This guarantees the Resolver and the Form Data match perfectly.
+type OrgFormData = yup.InferType<typeof schema>
 
 const industries = [
   { value: '', label: 'Select your industry' },
@@ -47,24 +45,32 @@ const industries = [
 const OrganizationStep = () => {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
-  const [logoPreview, setLogoPreview] = useState<string | null>(null)
 
-  const { handleSubmit, control, formState: { errors }, watch } = useForm<OrgFormData>({
+  const { 
+    handleSubmit, 
+    control, 
+    setValue, 
+    watch, 
+    formState: { errors } 
+  } = useForm<OrgFormData>({
+    resolver: yupResolver(schema),
     defaultValues: {
       companyName: '',
       industry: '',
+      logoUrl: '',
       primaryColor: '#0d6efd',
       secondaryColor: '#6c757d',
     },
-    resolver: yupResolver(schema),
   })
+
+  const logoPreview = watch('logoUrl')
 
   const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
       const reader = new FileReader()
       reader.onloadend = () => {
-        setLogoPreview(reader.result as string)
+        setValue('logoUrl', reader.result as string)
       }
       reader.readAsDataURL(file)
     }
@@ -76,7 +82,6 @@ const OrganizationStep = () => {
     // Simulate API delay
     await new Promise(resolve => setTimeout(resolve, 800))
     
-    // Store data in sessionStorage for demo purposes
     sessionStorage.setItem('onboarding_org', JSON.stringify(data))
     
     setLoading(false)
@@ -102,11 +107,8 @@ const OrganizationStep = () => {
         </div>
 
         <Form onSubmit={handleSubmit(onSubmit)}>
-          {/* Company Name */}
           <Form.Group className="mb-3">
-            <Form.Label>
-              Company Name <span className="text-danger">*</span>
-            </Form.Label>
+            <Form.Label>Company Name <span className="text-danger">*</span></Form.Label>
             <Controller
               name="companyName"
               control={control}
@@ -127,20 +129,14 @@ const OrganizationStep = () => {
             />
           </Form.Group>
 
-          {/* Industry */}
           <Form.Group className="mb-3">
-            <Form.Label>
-              Industry <span className="text-danger">*</span>
-            </Form.Label>
+            <Form.Label>Industry <span className="text-danger">*</span></Form.Label>
             <Controller
               name="industry"
               control={control}
               render={({ field }) => (
                 <>
-                  <Form.Select
-                    {...field}
-                    isInvalid={!!errors.industry}
-                  >
+                  <Form.Select {...field} isInvalid={!!errors.industry}>
                     {industries.map(industry => (
                       <option key={industry.value} value={industry.value}>
                         {industry.label}
@@ -155,41 +151,21 @@ const OrganizationStep = () => {
             />
           </Form.Group>
 
-          {/* Logo Upload */}
           <Form.Group className="mb-3">
             <Form.Label>Company Logo (Optional)</Form.Label>
             <div className="d-flex align-items-start gap-3">
               {logoPreview && (
-                <div 
-                  className="border rounded p-2 bg-light"
-                  style={{ width: '80px', height: '80px' }}
-                >
-                  <img 
-                    src={logoPreview} 
-                    alt="Logo preview" 
-                    style={{ 
-                      width: '100%', 
-                      height: '100%', 
-                      objectFit: 'contain' 
-                    }} 
-                  />
+                <div className="border rounded p-2 bg-light" style={{ width: '80px', height: '80px' }}>
+                  <img src={logoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
                 </div>
               )}
               <div className="flex-grow-1">
-                <Form.Control
-                  type="file"
-                  accept="image/*"
-                  onChange={handleLogoChange}
-                  size="sm"
-                />
-                <Form.Text className="text-muted">
-                  PNG, JPG or SVG. Max size 2MB. Square format recommended.
-                </Form.Text>
+                <Form.Control type="file" accept="image/*" onChange={handleLogoChange} size="sm" />
+                <Form.Text className="text-muted">PNG, JPG or SVG. Max 2MB.</Form.Text>
               </div>
             </div>
           </Form.Group>
 
-          {/* Brand Colors */}
           <Form.Group className="mb-4">
             <Form.Label>Brand Colors (Optional)</Form.Label>
             <div className="row g-3">
@@ -201,18 +177,8 @@ const OrganizationStep = () => {
                     <div>
                       <Form.Label className="small text-muted">Primary Color</Form.Label>
                       <div className="d-flex gap-2 align-items-center">
-                        <Form.Control
-                          {...field}
-                          type="color"
-                          style={{ width: '60px', height: '40px' }}
-                        />
-                        <Form.Control
-                          type="text"
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          placeholder="#0d6efd"
-                          className="font-monospace small"
-                        />
+                        <Form.Control {...field} type="color" style={{ width: '60px', height: '40px' }} />
+                        <Form.Control {...field} type="text" className="font-monospace small" />
                       </div>
                     </div>
                   )}
@@ -226,18 +192,8 @@ const OrganizationStep = () => {
                     <div>
                       <Form.Label className="small text-muted">Secondary Color</Form.Label>
                       <div className="d-flex gap-2 align-items-center">
-                        <Form.Control
-                          {...field}
-                          type="color"
-                          style={{ width: '60px', height: '40px' }}
-                        />
-                        <Form.Control
-                          type="text"
-                          value={field.value}
-                          onChange={(e) => field.onChange(e.target.value)}
-                          placeholder="#6c757d"
-                          className="font-monospace small"
-                        />
+                        <Form.Control {...field} type="color" style={{ width: '60px', height: '40px' }} />
+                        <Form.Control {...field} type="text" className="font-monospace small" />
                       </div>
                     </div>
                   )}
@@ -246,15 +202,8 @@ const OrganizationStep = () => {
             </div>
           </Form.Group>
 
-          {/* Continue Button */}
           <div className="d-grid">
-            <Button
-              type="submit"
-              variant="primary"
-              size="lg"
-              className="fw-medium"
-              disabled={loading}
-            >
+            <Button type="submit" variant="primary" size="lg" disabled={loading}>
               {loading ? (
                 <>
                   <span className="spinner-border spinner-border-sm me-2" role="status" />

@@ -9,7 +9,7 @@ const DarkTopNav = () => {
   useEffect(() => {
     changeTopbarTheme('dark')
     route.push('/dashboards')
-  }, [])
+  }, [changeTopbarTheme, route])
   return <></>
 }
 

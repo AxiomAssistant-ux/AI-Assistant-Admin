@@ -18,9 +18,20 @@ export interface ActiveCallsData {
 /**
  * Hook to track active calls in real-time
  * 
+ * IMPORTANT: This hook does NOT create its own WebSocket connection.
+ * It relies on the parent component having useRealtimeUpdates() with
+ * onActiveCallsUpdated callback.
+ * 
  * Usage:
  * ```tsx
- * const { activeCallsCount, activeCalls, isLoading } = useActiveCalls()
+ * // In parent component:
+ * useRealtimeUpdates({
+ *   onActiveCallsUpdated: (data) => console.log(data),
+ *   // ... other callbacks
+ * })
+ * 
+ * // In child component:
+ * const { activeCallsCount, activeCalls } = useActiveCalls()
  * ```
  */
 export function useActiveCalls() {
@@ -28,46 +39,26 @@ export function useActiveCalls() {
     count: 0,
     calls: []
   })
-  const [isLoading, setIsLoading] = useState(true)
 
-  const handleActiveCallsUpdate = useCallback((data: ActiveCallsData) => {
-    console.log('📞 Active calls updated:', data)
-    setActiveCallsData(data)
-    setIsLoading(false)
-  }, [])
-
-  const handleConnect = useCallback(() => {
-    console.log('✅ Active calls tracking connected')
-    setIsLoading(false)
-  }, [])
-
-  const handleDisconnect = useCallback(() => {
-    console.log('❌ Active calls tracking disconnected')
-    // Keep last known state on disconnect
-  }, [])
-
-  // Subscribe to real-time updates
-  const { isConnected } = useRealtimeUpdates({
-    onConnect: handleConnect,
-    onDisconnect: handleDisconnect,
-    onMessage: (message) => {
-      if (message.event === 'active_calls_updated') {
-        handleActiveCallsUpdate(message.data)
-      }
+  // Listen for custom events dispatched by the shared WebSocket
+  useEffect(() => {
+    const handleUpdate = (event: CustomEvent<ActiveCallsData>) => {
+      console.log('📞 Active calls badge received update:', event.detail)
+      setActiveCallsData(event.detail)
     }
-  })
+
+    window.addEventListener('active_calls_updated' as any, handleUpdate)
+    
+    return () => {
+      window.removeEventListener('active_calls_updated' as any, handleUpdate)
+    }
+  }, [])
 
   return {
     /** Number of active calls */
     activeCallsCount: activeCallsData.count,
     
     /** List of active calls */
-    activeCalls: activeCallsData.calls,
-    
-    /** Whether the initial data is loading */
-    isLoading,
-    
-    /** Whether real-time updates are connected */
-    isConnected
+    activeCalls: activeCallsData.calls
   }
 }

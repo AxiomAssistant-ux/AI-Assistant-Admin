@@ -11,7 +11,10 @@ const Page = () => {
   const { user } = useAuth()
 
   // const menuItems = getMenuItems(user?.actor ?? null)
-  const menuItems = getAccessibleMenuItems(user?.actor ?? null, user)
+  const menuItems = getAccessibleMenuItems(user?.actor ?? null, {
+    is_admin: user?.role === 'admin',
+    features: []
+  })
 
 
   return (

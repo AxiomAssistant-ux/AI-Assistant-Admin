@@ -340,11 +340,11 @@ const AdminSupportTicketsPage = () => {
     setViewModalOpen(true)
   }
 
-  const handleViewOrganization = (orgId: string | null) => {
+  const handleViewOrganization = useCallback((orgId: string | null) => {
     if (orgId) {
       router.push(`/organizations/${orgId}/details`)
     }
-  }
+  },[])
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '—'
@@ -555,7 +555,7 @@ const AdminSupportTicketsPage = () => {
         )
       }
     ],
-    [startIndex]
+    [startIndex, handleViewOrganization]
   )
 
   return (

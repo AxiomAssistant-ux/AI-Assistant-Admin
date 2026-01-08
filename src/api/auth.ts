@@ -35,6 +35,7 @@ export interface OrgUserResponse {
     status: string
     is_admin: boolean
     role_name?: string
+    role: string
     features: string[]
     created_at: string
     updated_at: string
@@ -43,6 +44,7 @@ export interface OrgUserResponse {
     _id: string
     company_name: string
     logo_url?: string
+    role: string
     industry?: string
     status: string
   }

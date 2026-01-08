@@ -46,6 +46,7 @@ export interface OrgUserData {
   status: 'active' | 'invited' | 'suspended'
   is_admin: boolean
   role_name?: string
+  role: string
   features: string[]
   created_at: string
   updated_at: string
@@ -91,11 +92,13 @@ export type UserOut =
   | {
       actor: 'org'
       id: string
+      _id: string
       email: string
       name: string
       org_id: string
       is_admin: boolean
       role_name?: string
+      role: string
       status: string
       features: string[]
       organization: OrganizationData
@@ -103,8 +106,10 @@ export type UserOut =
   | {
       actor: 'platform'
       id: string
+      _id: string
       email: string
       name: string
+      role: string
       status: string
     }
 

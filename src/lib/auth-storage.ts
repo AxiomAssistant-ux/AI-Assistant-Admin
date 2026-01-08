@@ -2,14 +2,14 @@
  * Client-side storage utilities for authentication tokens and user data
  */
 
-import type { TokenOut, UserOut } from '@/types/auth'
+import type { UserOut } from '@/types/auth'
 
 const TOKEN_KEY = 'auth_token'
 const USER_KEY = 'auth_user'
 const TOKEN_EXPIRY_KEY = 'auth_token_expiry'
 
 export const authStorage = {
-  saveAuth(tokenData: TokenOut): void {
+  saveAuth(tokenData): void {
     if (typeof window === 'undefined') return
 
     try {

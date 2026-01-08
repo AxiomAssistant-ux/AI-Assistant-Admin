@@ -30,6 +30,7 @@ export interface UseRealtimeUpdatesOptions {
   onAppointmentUpdated?: (data: any) => void
   onOrderCreated?: (data: any) => void
   onOrderUpdated?: (data: any) => void
+  onActiveCallsUpdated?: (data: any) => void
   autoReconnect?: boolean
   reconnectDelay?: number
 }
@@ -91,14 +92,34 @@ export function useRealtimeUpdates(options: UseRealtimeUpdatesOptions = {}) {
 
           const h = optionsRef.current;
           switch (message.event) {
-            case 'call_log_created': h.onCallLogCreated?.(message.data); break
-            case 'complaint_created': h.onComplaintCreated?.(message.data); break
-            case 'complaint_updated': h.onComplaintUpdated?.(message.data); break
-            case 'appointment_created': h.onAppointmentCreated?.(message.data); break
-            case 'appointment_updated': h.onAppointmentUpdated?.(message.data); break
-            case 'order_created': h.onOrderCreated?.(message.data); break
-            case 'order_updated': h.onOrderUpdated?.(message.data); break
-            // Active calls update is handled via onMessage callback
+            case 'call_log_created': 
+              h.onCallLogCreated?.(message.data)
+              break
+            case 'complaint_created': 
+              h.onComplaintCreated?.(message.data)
+              break
+            case 'complaint_updated': 
+              h.onComplaintUpdated?.(message.data)
+              break
+            case 'appointment_created': 
+              h.onAppointmentCreated?.(message.data)
+              break
+            case 'appointment_updated': 
+              h.onAppointmentUpdated?.(message.data)
+              break
+            case 'order_created': 
+              h.onOrderCreated?.(message.data)
+              break
+            case 'order_updated': 
+              h.onOrderUpdated?.(message.data)
+              break
+            case 'active_calls_updated':
+              h.onActiveCallsUpdated?.(message.data)
+              // Dispatch custom event for useActiveCalls hook
+              window.dispatchEvent(new CustomEvent('active_calls_updated', { 
+                detail: message.data 
+              }))
+              break
           }
         } catch (err) {
           console.error('[WebSocket] Failed to parse message:', err)

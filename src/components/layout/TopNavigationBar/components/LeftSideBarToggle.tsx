@@ -31,7 +31,7 @@ const LeftSideBarToggle = () => {
     if (width <= 1140) {
       if (size !== 'hidden') changeMenuSize('hidden')
     }
-  }, [pathname, width])
+  }, [pathname, width, size, toggleBackdrop, changeMenuSize])
 
   return (
     <div className="topbar-item">

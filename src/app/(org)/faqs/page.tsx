@@ -204,7 +204,7 @@ const FAQPage = () => {
               {searchQuery && (
                 <div className="mb-3">
                   <p className="text-muted">
-                    Found {filteredFAQs.length} result{filteredFAQs.length !== 1 ? 's' : ''} for "{searchQuery}"
+                    Found {filteredFAQs.length} result{filteredFAQs.length !== 1 ? 's' : ''} for &quot;{searchQuery}&quot;
                   </p>
                 </div>
               )}
@@ -258,7 +258,7 @@ const FAQPage = () => {
 
               <div className="text-center mt-5 pt-4 border-top">
                 <h5 className="mb-3">Still need help?</h5>
-                <p className="text-muted mb-3">Can't find what you're looking for? Our support team is here to help.</p>
+                <p className="text-muted mb-3">Can not find what you are looking for? Our support team is here to help.</p>
                 <Link href="/contact-support" className="btn btn-primary">
                   <IconifyIcon icon="solar:chat-round-linear" width={20} height={20} className="me-2" />
                   Contact Support

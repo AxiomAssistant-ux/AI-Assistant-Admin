@@ -1,7 +1,7 @@
 // assistant-app/app/auth/callback/page.tsx
 
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardBody, Spinner, Alert } from 'react-bootstrap'
 
@@ -11,19 +11,7 @@ export default function AuthCallback() {
   const [error, setError] = useState<string | null>(null)
   const [status, setStatus] = useState<string>('Verifying your account...')
 
-  useEffect(() => {
-    const token = searchParams.get('token')
-
-    if (!token) {
-      setError('Invalid callback: missing token')
-      setTimeout(() => router.push('/auth/sign-in'), 3000)
-      return
-    }
-
-    exchangeToken(token)
-  }, [searchParams, router])
-
-  const exchangeToken = async (redirectToken: string) => {
+  const exchangeToken = useCallback(async (redirectToken: string) => {
     try {
       setStatus('Exchanging verification token...')
 
@@ -93,7 +81,19 @@ export default function AuthCallback() {
       setError(err instanceof Error ? err.message : 'Authentication failed')
       setTimeout(() => router.push('/auth/sign-in'), 5000)
     }
-  }
+  }, [router])
+
+  useEffect(() => {
+    const token = searchParams.get('token')
+
+    if (!token) {
+      setError('Invalid callback: missing token')
+      setTimeout(() => router.push('/auth/sign-in'), 3000)
+      return
+    }
+
+    exchangeToken(token)
+  }, [searchParams, router, exchangeToken])
 
   if (error) {
     return (

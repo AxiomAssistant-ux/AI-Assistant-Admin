@@ -120,7 +120,7 @@ const DocumentsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [token, isAuthenticated, user?.role, debouncedSearch, typeFilter])
+  }, [isAuthenticated, user?.role, debouncedSearch, typeFilter])
 
   const fetchAgents = useCallback(async () => {
     if (!token || !isAuthenticated ) {
@@ -146,7 +146,7 @@ const DocumentsPage = () => {
     } finally {
       setAgentsLoading(false)
     }
-  }, [token, isAuthenticated, user?.role])
+  }, [isAuthenticated, user?.role])
 
   useEffect(() => {
     fetchDocuments()
@@ -233,7 +233,7 @@ const DocumentsPage = () => {
     return true
   }
 
-  const handleViewRow = async (doc: KnowledgeBaseDocument) => {
+  const handleViewRow = useCallback(async (doc: KnowledgeBaseDocument) => {
     if (!ensureAdminAccess()) return
     const docId = getDocumentIdentifier(doc)
     if (!docId) {
@@ -269,14 +269,14 @@ const DocumentsPage = () => {
     } finally {
       setViewLoadingId(null)
     }
-  }
+  },[])
 
-  const handleAttachPrompt = (doc: KnowledgeBaseDocument) => {
+  const handleAttachPrompt = useCallback((doc: KnowledgeBaseDocument) => {
     if (!ensureAdminAccess()) return
     setSelectedDocument(doc)
     setAttachAgentId('')
     setAttachModalOpen(true)
-  }
+  },[])
 
   const handleAttachSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()

@@ -85,7 +85,7 @@ const IncidentsPage = () => {
     }
   }, [currentPage, totalPages])
 
-  const handleStatusToggle = async (incidentId: string, currentStatus: ActionItem['status']) => {
+  const handleStatusToggle = useCallback(async (incidentId: string, currentStatus: ActionItem['status']) => {
     const statusFlow: Record<ActionItem['status'], ActionItem['status']> = {
       pending: 'in_progress',
       in_progress: 'completed',
@@ -112,9 +112,9 @@ const IncidentsPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  }
+  },[])
 
-  const handleUrgencyToggle = async (incidentId: string, currentUrgency: ActionItem['urgency']) => {
+  const handleUrgencyToggle = useCallback(async (incidentId: string, currentUrgency: ActionItem['urgency']) => {
     const newUrgency = (currentUrgency === 'high' || currentUrgency === 'critical') ? 'low' : 'high'
     
     setUpdatingField({ incidentId, field: 'urgency' })
@@ -135,7 +135,7 @@ const IncidentsPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  }
+  },[])
 
   const handleRoleSave = async (incidentId: string) => {
     if (!roleValue.trim()) {
@@ -350,7 +350,7 @@ const IncidentsPage = () => {
         )
       }
     ],
-    [updatingField, startIndex]
+    [updatingField, startIndex, handleStatusToggle, handleUrgencyToggle]
   )
 
   return (

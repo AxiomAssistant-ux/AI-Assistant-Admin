@@ -14,6 +14,8 @@ import { callLogsApi, type CallLog, type CallLogsListParams } from '@/api/org/ca
 import { locationsApi, type Location } from '@/api/org/locations'
 import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates'
+import { useCallLogUpdates } from '@/hooks/useCallLogUpdates'
+import { useRealtime } from '@/context/RealtimeContext'
 
 const CallRecordsPage = () => {
   useFeatureGuard()
@@ -52,6 +54,11 @@ const CallRecordsPage = () => {
   // Track if modal was opened from complaints page
   const [hasAutoOpened, setHasAutoOpened] = useState(false)
   const [openedFromComplaints, setOpenedFromComplaints] = useState(false)
+
+  // const { isConnected: realtimeConnected } = useRealtime()
+  // useCallLogUpdates({
+  //   onCallLogCreated: handleCallLogCreated
+  // })
 
   // Debounce search
   useEffect(() => {
@@ -202,11 +209,22 @@ const CallRecordsPage = () => {
     // Refresh call logs to show new data
     fetchCallLogs()
   }, [fetchCallLogs]);
+  
   // ===== REAL-TIME UPDATES =====
+  // const { isConnected: realtimeConnected } = useRealtimeUpdates({
+  //   onCallLogCreated: handleCallLogCreated,
+  //   onConnect: useCallback(() => console.log('✅ Real-time updates connected'), []),
+  //   onDisconnect: useCallback(() => console.log('❌ Real-time updates disconnected'), [])
+  // })
+
   const { isConnected: realtimeConnected } = useRealtimeUpdates({
     onCallLogCreated: handleCallLogCreated,
-    onConnect: useCallback(() => console.log('✅ Real-time updates connected'), []),
-    onDisconnect: useCallback(() => console.log('❌ Real-time updates disconnected'), [])
+    onActiveCallsUpdated: (data) => {
+      console.log('📞 Active calls updated on page:', data)
+      // Badge will automatically update via custom event
+    },
+    onConnect: () => console.log('✅ Real-time updates connected'),
+    onDisconnect: () => console.log('❌ Real-time updates disconnected')
   })
 
   // Handle opening specific call log from URL parameter
@@ -555,33 +573,33 @@ const CallRecordsPage = () => {
         <Col xs={12}>
           <div className="page-title-box d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
             {/* <div className="d-flex align-items-center gap-3"> */}
-              <div>
-                <h4 className="mb-2">Call Records</h4>
-                <ol className="breadcrumb mb-0">
-                  <li className="breadcrumb-item">
-                    <Link href="/">AI Assistant</Link>
-                  </li>
-                  <div className="mx-1" style={{ height: 24, paddingRight: '8px' }}>
-                    <IconifyIcon icon="bx:chevron-right" height={16} width={16} />
-                  </div>
-                  <li className="breadcrumb-item active">Call Records</li>
-                </ol>
-              </div>
+            <div>
+              <h4 className="mb-2">Call Records</h4>
+              <ol className="breadcrumb mb-0">
+                <li className="breadcrumb-item">
+                  <Link href="/">AI Assistant</Link>
+                </li>
+                <div className="mx-1" style={{ height: 24, paddingRight: '8px' }}>
+                  <IconifyIcon icon="bx:chevron-right" height={16} width={16} />
+                </div>
+                <li className="breadcrumb-item active">Call Records</li>
+              </ol>
+            </div>
 
-              {/* Real-time connection indicator */}
-              {realtimeConnected && (
-                <Badge bg="success" className="d-flex gap-1 px-3 py-2">
-                  <span
-                    className="rounded-circle bg-white"
-                    style={{
-                      width: 6,
-                      height: 6,
-                      animation: 'pulse 2s ease-in-out infinite'
-                    }}
-                  />
-                  <span className="fw-semibold">Live Updates</span>
-                </Badge>
-              )}
+            {/* Real-time connection indicator */}
+            {realtimeConnected && (
+              <Badge bg="success" className="d-flex gap-1 px-3 py-2">
+                <span
+                  className="rounded-circle bg-white"
+                  style={{
+                    width: 6,
+                    height: 6,
+                    animation: 'pulse 2s ease-in-out infinite'
+                  }}
+                />
+                <span className="fw-semibold">Live Updates</span>
+              </Badge>
+            )}
             {/* </div> */}
           </div>
         </Col>

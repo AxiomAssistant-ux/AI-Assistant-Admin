@@ -119,7 +119,7 @@ const AgentsTab: React.FC<AgentsTabProps> = ({ organization, onRefresh }) => {
     } catch (err) {
       toast.error('Failed to load available agents')
     }
-  }, [token])
+  }, [])
 
   const handleOpenAssignModal = () => {
     fetchAvailableAgents()

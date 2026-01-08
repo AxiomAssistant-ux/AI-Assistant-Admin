@@ -9,7 +9,7 @@ const HiddenSideNav = () => {
   useEffect(() => {
     changeMenu.size('hidden')
     route.push('/dashboards')
-  }, [])
+  }, [changeMenu, route])
   return <></>
 }
 

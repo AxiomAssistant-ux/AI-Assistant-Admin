@@ -9,7 +9,7 @@ const DarkSideNav = () => {
   useEffect(() => {
     changeMenu.theme('dark')
     route.push('/dashboards')
-  }, [])
+  }, [changeMenu, route])
   return <></>
 }
 
