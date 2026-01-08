@@ -331,7 +331,7 @@ const ActionItemsPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  },[])
+  },[selectedItem])
 
   const handleDueDateSave = async (itemId: string) => {
     if (!dueDateValue) {
@@ -647,7 +647,7 @@ const ActionItemsPage = () => {
         )
       }
     ],
-    [updatingField, startIndex, handleStatusToggle]
+    [updatingField, startIndex, handleStatusToggle, handleConfirmAppointment, handleConfirmOrder, handleUrgencyToggle]
   )
 
   return (

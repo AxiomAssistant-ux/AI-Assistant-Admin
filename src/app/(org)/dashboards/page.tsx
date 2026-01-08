@@ -42,9 +42,7 @@ const DashboardPage = () => {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    loadDashboardData()
-  }, [period])
+
 
   const loadDashboardData = useCallback(async () => {
     try {
@@ -72,7 +70,11 @@ const DashboardPage = () => {
     } finally {
       setLoading(false)
     }
-  },[])
+  }, [period])
+
+  useEffect(() => {
+    loadDashboardData()
+  }, [period, loadDashboardData])
 
   // Calls Over Time Chart
   const callsOverTimeChart: ApexOptions = useMemo(() => ({

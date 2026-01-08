@@ -334,7 +334,7 @@ const VerticalsPage = () => {
     } finally {
       setTogglingId(null)
     }
-  },[])
+  },[isAdmin, token])
 
   const handleModuleToggle = (module: ModuleType) => {
     setFormState(prev => ({

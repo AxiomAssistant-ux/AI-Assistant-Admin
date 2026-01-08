@@ -24,14 +24,14 @@ const LayoutProvider = ({ children }: ChildrenType) => {
 
   const override = !!(queryParams.layout_theme || queryParams.topbar_theme || queryParams.menu_theme || queryParams.menu_size)
 
-  const INIT_STATE: LayoutState = {
+  const INIT_STATE: LayoutState = useMemo(() => ({
     theme: queryParams['layout_theme'] ? (queryParams['layout_theme'] as ThemeType) : 'light',
     topbarTheme: queryParams['topbar_theme'] ? (queryParams['topbar_theme'] as ThemeType) : 'light',
     menu: {
       theme: queryParams['menu_theme'] ? (queryParams['menu_theme'] as MenuType['theme']) : 'light',
       size: 'default',
     },
-  }
+  }), [queryParams])
 
   const [settings, setSettings] = useLocalStorage<LayoutState>('__REBACK_NEXT_CONFIG__', INIT_STATE, override)
   const [offcanvasStates, setOffcanvasStates] = useState<LayoutOffcanvasStatesType>({
@@ -64,24 +64,24 @@ const LayoutProvider = ({ children }: ChildrenType) => {
   }, [])
 
   // toggle theme customizer offcanvas
-  const toggleThemeCustomizer: OffcanvasControlType['toggle'] = () => {
-    setOffcanvasStates({ ...offcanvasStates, showThemeCustomizer: !offcanvasStates.showThemeCustomizer })
-  }
+  const toggleThemeCustomizer: OffcanvasControlType['toggle'] = useCallback(() => {
+    setOffcanvasStates(prev => ({ ...prev, showThemeCustomizer: !prev.showThemeCustomizer }))
+  }, [])
 
   // toggle activity stream offcanvas
-  const toggleActivityStream: OffcanvasControlType['toggle'] = () => {
-    setOffcanvasStates({ ...offcanvasStates, showActivityStream: !offcanvasStates.showActivityStream })
-  }
+  const toggleActivityStream: OffcanvasControlType['toggle'] = useCallback(() => {
+    setOffcanvasStates(prev => ({ ...prev, showActivityStream: !prev.showActivityStream }))
+  }, [])
 
-  const themeCustomizer: LayoutType['themeCustomizer'] = {
+  const themeCustomizer: LayoutType['themeCustomizer'] = useMemo(() => ({
     open: offcanvasStates.showThemeCustomizer,
     toggle: toggleThemeCustomizer,
-  }
+  }), [offcanvasStates.showThemeCustomizer, toggleThemeCustomizer])
 
-  const activityStream: LayoutType['activityStream'] = {
+  const activityStream: LayoutType['activityStream'] = useMemo(() => ({
     open: offcanvasStates.showActivityStream,
     toggle: toggleActivityStream,
-  }
+  }), [offcanvasStates.showActivityStream, toggleActivityStream])
 
   // toggle backdrop
   const toggleBackdrop = useCallback(() => {
@@ -130,7 +130,6 @@ const LayoutProvider = ({ children }: ChildrenType) => {
         }),
         [
           settings,
-          offcanvasStates,
           changeTheme,
           changeTopbarTheme,
           changeMenuTheme,

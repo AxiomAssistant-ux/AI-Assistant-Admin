@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Card, CardBody, Form, Button } from 'react-bootstrap'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
@@ -155,8 +156,8 @@ const OrganizationStep = () => {
             <Form.Label>Company Logo (Optional)</Form.Label>
             <div className="d-flex align-items-start gap-3">
               {logoPreview && (
-                <div className="border rounded p-2 bg-light" style={{ width: '80px', height: '80px' }}>
-                  <img src={logoPreview} alt="Preview" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                <div className="border rounded p-2 bg-light position-relative" style={{ width: '80px', height: '80px' }}>
+                  <Image src={logoPreview} alt="Preview" fill style={{ objectFit: 'contain' }} />
                 </div>
               )}
               <div className="flex-grow-1">

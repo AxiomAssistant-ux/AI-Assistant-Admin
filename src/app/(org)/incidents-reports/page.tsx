@@ -112,7 +112,7 @@ const IncidentsPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  },[])
+  },[selectedIncident])
 
   const handleUrgencyToggle = useCallback(async (incidentId: string, currentUrgency: ActionItem['urgency']) => {
     const newUrgency = (currentUrgency === 'high' || currentUrgency === 'critical') ? 'low' : 'high'
@@ -135,7 +135,7 @@ const IncidentsPage = () => {
     } finally {
       setUpdatingField(null)
     }
-  },[])
+  },[selectedIncident])
 
   const handleRoleSave = async (incidentId: string) => {
     if (!roleValue.trim()) {

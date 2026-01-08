@@ -120,7 +120,7 @@ const DocumentsPage = () => {
     } finally {
       setLoading(false)
     }
-  }, [isAuthenticated, user?.role, debouncedSearch, typeFilter])
+  }, [isAuthenticated, debouncedSearch, typeFilter, token])
 
   const fetchAgents = useCallback(async () => {
     if (!token || !isAuthenticated ) {
@@ -146,7 +146,7 @@ const DocumentsPage = () => {
     } finally {
       setAgentsLoading(false)
     }
-  }, [isAuthenticated, user?.role])
+  }, [isAuthenticated, token])
 
   useEffect(() => {
     fetchDocuments()
@@ -225,13 +225,13 @@ const DocumentsPage = () => {
     setCurrentPage(1)
   }
 
-  const ensureAdminAccess = () => {
+  const ensureAdminAccess = useCallback(() => {
     if (!token || !isAuthenticated ) {
       toast.error('You are not authorized to manage documents.')
       return false
     }
     return true
-  }
+  }, [token, isAuthenticated])
 
   const handleViewRow = useCallback(async (doc: KnowledgeBaseDocument) => {
     if (!ensureAdminAccess()) return
@@ -269,14 +269,14 @@ const DocumentsPage = () => {
     } finally {
       setViewLoadingId(null)
     }
-  },[])
+  },[ensureAdminAccess, token])
 
   const handleAttachPrompt = useCallback((doc: KnowledgeBaseDocument) => {
     if (!ensureAdminAccess()) return
     setSelectedDocument(doc)
     setAttachAgentId('')
     setAttachModalOpen(true)
-  },[])
+  },[ensureAdminAccess])
 
   const handleAttachSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault()
@@ -314,11 +314,11 @@ const DocumentsPage = () => {
     }
   }
 
-  const handleDeletePrompt = (doc: KnowledgeBaseDocument) => {
+  const handleDeletePrompt = useCallback((doc: KnowledgeBaseDocument) => {
     if (!ensureAdminAccess()) return
     setSelectedDocument(doc)
     setDeleteModalOpen(true)
-  }
+  }, [ensureAdminAccess])
 
   const columns: DataTableColumn<KnowledgeBaseDocument>[] = useMemo(
     () => [

@@ -3,6 +3,7 @@
 import { useEffect } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
 import Image from 'next/image'
+import Link from 'next/link'
 import DarkLogo from '@/assets/images/logo-dark.png'
 import LightLogo from '@/assets/images/logo-light.png'
 import { Row, Col } from 'react-bootstrap'
@@ -51,12 +52,12 @@ const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
             {/* Logo */}
             <div className="text-center mb-4">
               <div className="mx-auto auth-logo">
-                <a href="/" className="logo-dark">
+                <Link href="/" className="logo-dark">
                   <Image src={LightLogo} height={32} alt="logo dark" />
-                </a>
-                <a href="/" className="logo-light">
+                </Link>
+                <Link href="/" className="logo-light">
                   <Image src={LightLogo} height={32} alt="logo light" />
-                </a>
+                </Link>
               </div>
             </div>
 

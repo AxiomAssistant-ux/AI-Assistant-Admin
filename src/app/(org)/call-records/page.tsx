@@ -549,7 +549,7 @@ const CallRecordsPage = () => {
         width: 4
       },
     ],
-    [statusFilter, successFilter, actionFilter]
+    [statusFilter, successFilter]
   )
 
   if (!isAuthenticated) {

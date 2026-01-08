@@ -344,7 +344,7 @@ const AdminSupportTicketsPage = () => {
     if (orgId) {
       router.push(`/organizations/${orgId}/details`)
     }
-  },[])
+  },[router])
 
   const formatDate = (dateString?: string | null) => {
     if (!dateString) return '—'

@@ -91,12 +91,12 @@ const SignIn = () => {
                 <CardBody className="p-5">
                   <div className="text-center">
                     <div className="mx-auto mb-4 text-center auth-logo">
-                      <a href="/" className="logo-dark">
+                      <Link href="/" className="logo-dark">
                         <Image src={DarkLogo} height={32} alt="logo dark" />
-                      </a>
-                      <a href="/" className="logo-light">
+                      </Link>
+                      <Link href="/" className="logo-light">
                         <Image src={LightLogo} height={28} alt="logo light" />
-                      </a>
+                      </Link>
                     </div>
                     <h4 className="fw-bold text-dark mb-2">Welcome Back!</h4>
                     <p className="text-muted">Sign in to your organization account</p>

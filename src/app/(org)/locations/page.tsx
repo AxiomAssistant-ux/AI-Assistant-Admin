@@ -159,7 +159,7 @@ const LocationsPage = () => {
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to delete location'
       toast.error(errorMsg)
     }
-  },[])
+  },[fetchLocations])
 
   // Import handlers
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
