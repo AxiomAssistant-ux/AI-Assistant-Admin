@@ -215,12 +215,14 @@ const OrganizationSettingsPage = () => {
                   <div className="mb-3">
                     <Form.Label>Logo Preview</Form.Label>
                     <div className="border rounded p-3 bg-light">
-                      <Image 
-                        src={formData.logo_url} 
-                        alt="Company Logo" 
-                        style={{ maxHeight: '100px', maxWidth: '200px' }}
+                      <Image
+                        src={formData.logo_url || 'https://placehold.co/200x100'}
+                        alt="Company Logo"
+                        width={200}
+                        height={100}
+                        // style={{ maxWidth: '100%', height: 'auto' }}
                         onError={(e) => {
-                          (e.target as HTMLImageElement).style.display = 'none'
+                          e.currentTarget.style.display = 'none'
                         }}
                       />
                     </div>
@@ -231,8 +233,8 @@ const OrganizationSettingsPage = () => {
                   <div className="d-flex justify-content-between align-items-center mb-2">
                     <Form.Label className="mb-0">Brand Colors</Form.Label>
                     {isAdmin && (
-                      <Button 
-                        size="sm" 
+                      <Button
+                        size="sm"
                         variant="outline-primary"
                         onClick={handleAddColor}
                         disabled={!isAdmin || (formData.color_scheme?.length || 0) >= 5}
@@ -284,8 +286,8 @@ const OrganizationSettingsPage = () => {
 
                 {isAdmin && (
                   <div className="d-flex gap-2">
-                    <Button 
-                      variant="primary" 
+                    <Button
+                      variant="primary"
                       onClick={handleSave}
                       disabled={saving}
                     >
@@ -301,8 +303,8 @@ const OrganizationSettingsPage = () => {
                         </>
                       )}
                     </Button>
-                    <Button 
-                      variant="outline-secondary" 
+                    <Button
+                      variant="outline-secondary"
                       onClick={loadSettings}
                       disabled={saving}
                     >

@@ -143,16 +143,22 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     url: '/dashboards',
   },
   {
+    key: 'agent',
+    label: 'Call Assistant',
+    icon: 'solar:face-scan-square-broken',
+    url: '/agent',
+  },
+  {
     key: 'users-roles',
-    label: 'Users and Roles',
+    label: 'User Management',
     icon: 'solar:users-group-rounded-outline',
     url: '/users-roles',
   },
   {
-    key: 'complaints',
-    label: 'Complaints',
-    icon: 'solar:danger-triangle-linear',
-    url: '/complaints',
+    key: 'action-items',
+    label: 'Action Items',
+    icon: 'solar:checklist-outline',
+    url: '/action-items',
   },
   {
     key: 'call-records',
@@ -161,10 +167,10 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     url: '/call-records',
   },
   {
-    key: 'action-items',
-    label: 'Action Items',
-    icon: 'solar:checklist-outline',
-    url: '/action-items',
+    key: 'complaints',
+    label: 'Complaints',
+    icon: 'solar:danger-triangle-linear',
+    url: '/complaints',
   },
   {
     key: 'orders',
@@ -190,18 +196,18 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     icon: 'solar:map-outline',
     url: '/locations',
   },
-  {
-    key: 'knowledge-base',
-    label: 'Knowledge Bases',
-    icon: 'solar:book-outline',
-    url: '/documents',
-  },
-  {
-    key: 'agent-settings',
-    label: 'Agent Settings',
-    icon: 'solar:settings-outline',
-    url: '/agents-settings',
-  },
+  // {
+  //   key: 'knowledge-base',
+  //   label: 'Knowledge Bases',
+  //   icon: 'solar:book-outline',
+  //   url: '/knowledge-base',
+  // },
+  // {
+  //   key: 'agent-settings',
+  //   label: 'Agent Settings',
+  //   icon: 'solar:settings-outline',
+  //   url: '/agent-settings',
+  // },
   {
     key: 'usage-billing',
     label: 'Usage and Billings',

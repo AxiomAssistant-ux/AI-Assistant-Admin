@@ -5,16 +5,14 @@ import AppMenu from './components/AppMenu'
 import SimplebarReactClient from '@/components/wrapper/SimplebarReactClient'
 import LogoBox from '@/components/wrapper/LogoBox'
 import { useAuth } from '@/context/useAuthContext'
-import { getAccessibleMenuItems } from '@/helpers/Manu'
+import { getAccessibleMenuItems, getMenuItems } from '@/helpers/Manu'
 
 const Page = () => {
   const { user } = useAuth()
 
   // const menuItems = getMenuItems(user?.actor ?? null)
-  const menuItems = getAccessibleMenuItems(user?.actor ?? null, {
-    is_admin: user?.role === 'admin',
-    features: []
-  })
+  const menuItems =
+    user?.actor === 'platform' ? getMenuItems('platform') : getAccessibleMenuItems(user?.actor ?? null, user)
 
 
   return (

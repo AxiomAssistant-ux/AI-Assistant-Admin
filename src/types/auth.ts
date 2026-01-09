@@ -1,137 +1,69 @@
-/**
- * Authentication Types
- * Matches backend response structures exactly
- */
+// src/types/auth.ts
 
-// ===============================
-// Common Types
-// ===============================
+import type { VerticalKey } from '@/config/verticals'
 
-export type ActorType = 'org' | 'platform'
-
-// ===============================
-// Request Types
-// ===============================
+export type ActorType = 'platform' | 'org'
 
 export interface SignInRequest {
   email: string
   password: string
 }
 
-export interface SignUpRequest {
+export interface Organization {
+  _id: string
+  company_name: string
+  logo_url?: string
+  role: string
+  industry?: string
+  status: string
+  vertical_key?: VerticalKey // ADDED
+}
+
+export interface PlatformUser {
+  actor: 'platform'
+  id: string
+  _id: string
   email: string
-  password: string
-  name?: string
-  username?: string
+  name: string
+  role: 'super_admin' | 'support'
 }
 
-// ===============================
-// Response Types
-// ===============================
-
-export interface SignInResponse {
-  access_token: string
-  expires_in: number
-}
-
-// ===============================
-// Org User Types
-// ===============================
-
-export interface OrgUserData {
+export interface OrgUser {
+  actor: 'org'
+  id: string
   _id: string
   email: string
   name: string
   org_id: string
-  status: 'active' | 'invited' | 'suspended'
   is_admin: boolean
-  role_name?: string
+  role_name: string
   role: string
+  status: 'active' | 'invited' | 'suspended'
   features: string[]
-  created_at: string
-  updated_at: string
+  organization?: Organization
 }
 
-export interface OrganizationData {
-  _id: string
-  company_name: string
-  logo_url?: string
-  color_scheme?: string[]
-  industry?: string
-  vertical_key?: string
-  status: 'active' | 'trial' | 'suspended'
-}
+export type UserOut = PlatformUser | OrgUser
 
 export interface OrgUserResponse {
-  org_user: OrgUserData
-  organization: OrganizationData
+  org_user: {
+    _id: string
+    email: string
+    name: string
+    org_id: string
+    is_admin: boolean
+    role_name: string
+    role: string
+    status: string
+    features: string[]
+  }
+  organization: Organization
 }
 
-// ===============================
-// Platform User Types (for future)
-// ===============================
-
-export interface PlatformUserData {
-  _id: string
-  email: string
-  name: string
-  status: 'active' | 'suspended'
-  created_at: string
-  updated_at: string
-}
-
-export interface PlatformUserResponse {
-  platform_user: PlatformUserData
-}
-
-// ===============================
-// Unified User Type for Context
-// ===============================
-
-export type UserOut = 
-  | {
-      actor: 'org'
-      id: string
-      _id: string
-      email: string
-      name: string
-      org_id: string
-      is_admin: boolean
-      role_name?: string
-      role: string
-      status: string
-      features: string[]
-      organization: OrganizationData
-    }
-  | {
-      actor: 'platform'
-      id: string
-      _id: string
-      email: string
-      name: string
-      role: string
-      status: string
-    }
-
-// ===============================
-// Auth Context State
-// ===============================
-
-export interface AuthState {
-  user: UserOut | null
-  token: string | null
-  isLoading: boolean
-  isAuthenticated: boolean
-}
-
-// ===============================
-// Helper type guards
-// ===============================
-
-export function isOrgUser(user: UserOut | null): user is Extract<UserOut, { actor: 'org' }> {
-  return user?.actor === 'org'
-}
-
-export function isPlatformUser(user: UserOut | null): user is Extract<UserOut, { actor: 'platform' }> {
+export const isPlatformUser = (user?: UserOut | null): user is PlatformUser => {
   return user?.actor === 'platform'
+}
+
+export const isOrgUser = (user?: UserOut | null): user is OrgUser => {
+  return user?.actor === 'org'
 }

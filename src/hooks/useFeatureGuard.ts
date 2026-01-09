@@ -1,10 +1,12 @@
+// src/hooks/useFeatureGuard.tsx
+
 'use client'
 
 import { useEffect } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import { PAGE_FEATURES } from '@/config/page-features'
 import { isOrgUser } from '@/types/auth'
-import { hasPageAccess } from '@/helpers/feature-access'
+import { hasFullPageAccess } from '@/helpers/feature-access'
 import { useAuth } from '@/context/useAuthContext'
 
 export const useFeatureGuard = () => {
@@ -15,14 +17,14 @@ export const useFeatureGuard = () => {
   useEffect(() => {
     if (!isAuthenticated || !user) return
 
+    // Platform users have full access
+    if (!isOrgUser(user)) return
+
     const requiredFeature = PAGE_FEATURES[pathname]
-    // Only Org Users have features. Platform users have full access.
-    // If it's an Org User, check their features.
-    // If it's a Platform User, they implicitly have access to all features.
-    if (isOrgUser(user) && !hasPageAccess(user.features, requiredFeature)) {
+
+    // Check BOTH vertical AND feature access
+    if (!hasFullPageAccess(user, pathname, requiredFeature)) {
       router.replace('/403')
     }
   }, [pathname, user, isAuthenticated, router])
 }
-
-

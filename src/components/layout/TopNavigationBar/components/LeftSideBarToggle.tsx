@@ -1,5 +1,5 @@
 'use client'
-import React, { useEffect, useRef } from 'react'
+import React, { useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import { useLayoutContext } from '@/context/useLayoutContext'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
@@ -13,7 +13,6 @@ const LeftSideBarToggle = () => {
   } = useLayoutContext()
   const pathname = usePathname()
   const { width } = useViewPort()
-  const isFirstRender = useRef(true)
 
   const handleMenuSize = () => {
     if (size === 'hidden') toggleBackdrop()
@@ -22,16 +21,21 @@ const LeftSideBarToggle = () => {
   }
 
   useEffect(() => {
-    if (isFirstRender.current) {
-      isFirstRender.current = false
-    } else if (size === 'hidden') {
-      toggleBackdrop()
-    }
-
     if (width <= 1140) {
       if (size !== 'hidden') changeMenuSize('hidden')
+    } else {
+      if (size === 'hidden') changeMenuSize('default')
     }
-  }, [pathname, width, size, toggleBackdrop, changeMenuSize])
+  }, [width, size, changeMenuSize])
+
+  useEffect(() => {
+    if (size === 'hidden') {
+      const htmlTag = document.getElementsByTagName('html')[0]
+      if (htmlTag.classList.contains('sidebar-enable')) {
+        toggleBackdrop()
+      }
+    }
+  }, [pathname, size, toggleBackdrop])
 
   return (
     <div className="topbar-item">

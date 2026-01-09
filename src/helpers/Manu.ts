@@ -1,12 +1,13 @@
 // src/helpers/Manu.ts
+
 import {
   PLATFORM_MENU_ITEMS,
   ORG_MENU_ITEMS,
 } from '@/assets/data/menu-items'
 import type { MenuItemType } from '@/types/menu'
-import type { ActorType } from '@/types/auth'
+import type { ActorType, OrgUser } from '@/types/auth'
 import { PAGE_FEATURES } from '@/config/page-features'
-
+import { isMenuAllowedForVertical } from '@/config/verticals'
 
 /* ================================
    MENU SELECTOR
@@ -26,6 +27,46 @@ export const getMenuItems = (
   }
 
   return []
+}
+
+/* ================================
+   ACCESSIBLE MENU WITH VERTICAL + FEATURE FILTERING
+   ================================ */
+
+export const getAccessibleMenuItems = (
+  actor: ActorType | null | undefined,
+  user?: OrgUser
+): MenuItemType[] => {
+  const menuItems = getMenuItems(actor)
+
+  // No user → no menu
+  if (!user) return []
+
+  const verticalKey = user.organization?.vertical_key
+
+  return menuItems.filter(item => {
+    // Always show menu titles
+    if (item.isTitle) return true
+
+    // Step 1: Check vertical access (APPLIES TO EVERYONE including admins)
+    if (!isMenuAllowedForVertical(item.key, verticalKey)) {
+      return false
+    }
+
+    // Step 2: Admins see all items that pass vertical check
+    if (user.is_admin) return true
+
+    // Step 3: Check feature access for non-admins
+    // No URL → safe to show
+    if (!item.url) return true
+
+    const requiredFeature = PAGE_FEATURES[item.url]
+
+    // No feature mapping → public item
+    if (!requiredFeature) return true
+
+    return user.features?.includes(requiredFeature)
+  })
 }
 
 /* ================================
@@ -77,35 +118,4 @@ export const findMenuItem = (
     }
   }
   return null
-}
-
-export const getAccessibleMenuItems = (
-  actor: ActorType | null | undefined,
-  user?: {
-    is_admin?: boolean
-    features?: string[]
-  }
-): MenuItemType[] => {
-  const menuItems = getMenuItems(actor)
-
-  // No user → no menu
-  if (!user) return []
-
-  return menuItems.filter(item => {
-    // Always show menu titles
-    if (item.isTitle) return true
-
-    // Admin sees everything
-    if (user.is_admin) return true
-
-    // No URL → safe to show
-    if (!item.url) return true
-
-    const requiredFeature = PAGE_FEATURES[item.url]
-
-    // No feature mapping → public item
-    if (!requiredFeature) return true
-
-    return user.features?.includes(requiredFeature)
-  })
 }

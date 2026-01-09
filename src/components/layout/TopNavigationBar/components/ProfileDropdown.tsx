@@ -42,22 +42,22 @@ const ProfileDropdown = () => {
             </div>
           )}
         </DropdownHeader>
-        <DropdownItem href="">
+        <DropdownItem href="org-settings">
           <IconifyIcon icon="solar:user-outline" className="align-middle me-2 fs-18" />
           <span className="align-middle">My Account</span>
         </DropdownItem>
-        <DropdownItem href="">
+        {/* <DropdownItem href="">
           <IconifyIcon icon="solar:wallet-outline" className="align-middle me-2 fs-18" />
           <span className="align-middle">Pricing</span>
-        </DropdownItem>
-        <DropdownItem href="">
+        </DropdownItem> */}
+        <DropdownItem href="/contact-support">
           <IconifyIcon icon="solar:help-outline" className="align-middle me-2 fs-18" />
           <span className="align-middle">Help</span>
         </DropdownItem>
-        <DropdownItem href="/auth/lock-screen">
+        {/* <DropdownItem href="/auth/lock-screen">
           <IconifyIcon icon="solar:lock-keyhole-outline" className="align-middle me-2 fs-18" />
           <span className="align-middle">Lock screen</span>
-        </DropdownItem>
+        </DropdownItem> */}
         <div className="dropdown-divider my-1" />
         <DropdownItem className=" text-danger" onClick={handleLogout}>
           <IconifyIcon icon="solar:logout-3-outline" className="align-middle me-2 fs-18" />

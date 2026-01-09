@@ -2,7 +2,7 @@
  * Auth Context
  * Manages authentication state for both org and platform users
  * 
- * FIXED: Ensures token is saved before making authenticated requests
+ * FIXED: Properly parse MongoDB format from localStorage
  */
 
 'use client'
@@ -30,7 +30,16 @@ const AUTH_STORAGE = {
   getUser: (): UserOut | null => {
     if (typeof window === 'undefined') return null
     const userStr = localStorage.getItem('user')
-    return userStr ? JSON.parse(userStr) : null
+    if (!userStr) return null
+    
+    try {
+      const parsed = JSON.parse(userStr)
+      // Transform MongoDB format to clean format
+      return cleanMongoDBFormat(parsed)
+    } catch (error) {
+      console.error('Error parsing user from localStorage:', error)
+      return null
+    }
   },
   
   getTokenExpiry: (): number | null => {
@@ -50,7 +59,6 @@ const AUTH_STORAGE = {
     localStorage.setItem('token_expires_at', expiryTimestamp.toString())
   },
   
-  // NEW: Save just the token immediately
   saveToken: (token: string) => {
     if (typeof window === 'undefined') return
     localStorage.setItem('access_token', token)
@@ -72,23 +80,59 @@ const AUTH_STORAGE = {
 }
 
 // ===============================
+// Helper: Clean MongoDB Format
+// ===============================
+
+function cleanMongoDBFormat(obj: any): any {
+  if (obj === null || obj === undefined) return obj
+  
+  // Handle MongoDB ObjectId format: { $oid: "..." }
+  if (obj.$oid) {
+    return obj.$oid
+  }
+  
+  // Handle MongoDB Date format: { $date: "..." }
+  if (obj.$date) {
+    return obj.$date
+  }
+  
+  // Handle arrays
+  if (Array.isArray(obj)) {
+    return obj.map(item => cleanMongoDBFormat(item))
+  }
+  
+  // Handle objects
+  if (typeof obj === 'object') {
+    const cleaned: any = {}
+    for (const key in obj) {
+      cleaned[key] = cleanMongoDBFormat(obj[key])
+    }
+    return cleaned
+  }
+  
+  return obj
+}
+
+// ===============================
 // Transform Backend Response to UserOut
 // ===============================
 
 function transformOrgUserResponse(response: OrgUserResponse): UserOut {
+  const cleaned = cleanMongoDBFormat(response)
+  
   return {
     actor: 'org',
-    id: response.org_user._id,
-    _id: response.org_user._id,
-    email: response.org_user.email,
-    name: response.org_user.name,
-    org_id: response.org_user.org_id,
-    is_admin: response.org_user.is_admin,
-    role_name: response.org_user.role_name,
-    role: response.org_user.role_name || '',
-    status: response.org_user.status,
-    features: response.org_user.features,
-    organization: response.organization,
+    id: cleaned.org_user._id,
+    _id: cleaned.org_user._id,
+    email: cleaned.org_user.email,
+    name: cleaned.org_user.name,
+    org_id: cleaned.org_user.org_id,
+    is_admin: cleaned.org_user.is_admin,
+    role_name: cleaned.org_user.role_name,
+    role: cleaned.org_user.role_name || '',
+    status: cleaned.org_user.status,
+    features: cleaned.org_user.features,
+    organization: cleaned.organization,
   }
 }
 
@@ -126,6 +170,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const storedToken = AUTH_STORAGE.getToken()
       const storedUser = AUTH_STORAGE.getUser()
 
+      console.log('🔍 Initializing auth from storage:', {
+        hasToken: !!storedToken,
+        hasUser: !!storedUser,
+        verticalKey: storedUser?.actor === 'org' ? storedUser.organization?.vertical_key : undefined,
+        features: storedUser?.actor === 'org' ? storedUser.features : undefined,
+      })
+
       if (storedToken && storedUser && !AUTH_STORAGE.isTokenExpired()) {
         setToken(storedToken)
         setUser(storedUser)
@@ -140,7 +191,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   // ===============================
-  // Sign In - FIXED VERSION
+  // Sign In
   // ===============================
   const signIn = async (
     data: SignInRequest,
@@ -149,7 +200,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     try {
       setIsLoading(true)
 
-      // For now, only support org sign in
       if (isPlatform) {
         return { 
           success: false, 
@@ -160,19 +210,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       // Step 1: Sign in and get token
       const signInResponse = await authApi.orgSignIn(data)
       
-      // Step 2: IMMEDIATELY save token to localStorage BEFORE making next request
-      // This ensures the axios interceptor can read it
+      // Step 2: Save token immediately
       AUTH_STORAGE.saveToken(signInResponse.access_token)
       
-      console.log('✅ Token saved to localStorage:', signInResponse.access_token.substring(0, 20) + '...')
+      console.log('✅ Token saved to localStorage')
       
-      // Step 3: Now get current user data (token will be in headers via interceptor)
+      // Step 3: Get current user data
       const userResponse = await authApi.getCurrentOrgUser()
       
-      // Step 4: Transform to UserOut
+      // Step 4: Transform to UserOut (with MongoDB cleanup)
       const userOut = transformOrgUserResponse(userResponse as any)
       
-      // Step 5: Save complete auth data to storage
+      console.log('✅ User data transformed:', {
+        actor: userOut.actor,
+        name: userOut.name,
+        isAdmin: userOut.actor === 'org' ? userOut.is_admin : undefined,
+        verticalKey: userOut.actor === 'org' ? userOut.organization?.vertical_key : undefined,
+        features: userOut.actor === 'org' ? userOut.features : undefined,
+      })
+      
+      // Step 5: Save complete auth data
       AUTH_STORAGE.saveAuth(
         signInResponse.access_token,
         userOut,
@@ -183,7 +240,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setToken(signInResponse.access_token)
       setUser(userOut)
 
-      // Step 7: Redirect to dashboard
+      // Step 7: Redirect
       const redirectPath = '/dashboards'
       
       console.log('✅ Sign In Success:', {
@@ -199,10 +256,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: any) {
       console.error('❌ Sign in error:', error)
       
-      // Clear any partial auth data
       AUTH_STORAGE.clearAuth()
       
-      // Extract error message
       let errorMessage = 'An error occurred during sign in'
       
       if (error.response?.data?.detail) {
@@ -230,7 +285,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setToken(null)
     setUser(null)
     
-    // Redirect based on actor type
     const redirectPath = actor === 'platform' 
       ? '/auth/admin/sign-in' 
       : '/auth/sign-in'
@@ -246,10 +300,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     if (!currentToken || !user) return
 
     try {
-      // Only refresh org users for now
       if (user.actor === 'org') {
         const userResponse = await authApi.getCurrentOrgUser()
         const refreshedUser = transformOrgUserResponse(userResponse as any)
+        
+        // console.log('🔄 User refreshed:', {
+        //   verticalKey: refreshedUser.organization?.vertical_key,
+        //   features: refreshedUser.features,
+        // })
         
         setUser(refreshedUser)
         AUTH_STORAGE.saveAuth(
@@ -260,7 +318,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       }
     } catch (error) {
       console.error('Error refreshing user:', error)
-      // If refresh fails, sign out
       signOut()
     }
   }

@@ -10,58 +10,24 @@ import { useAuth } from '@/context/useAuthContext'
 import { toast } from 'react-toastify'
 import { orgUsersApi, type OrgUser, type CreateOrgUserRequest, type UpdateOrgUserRequest, type OrgUsersListParams } from '@/api/org/users'
 import { useFeatureGuard } from '@/hooks/useFeatureGuard'
+import { filterFeaturesByVertical } from '@/helpers/vertical-features'
+import { isOrgUser } from '@/types/auth'
 
-const AVAILABLE_FEATURES = [
+// ALL available features (will be filtered by vertical)
+const ALL_FEATURES = [
+  { value: 'agent', label: 'Agent' },
   { value: 'users-roles', label: 'Users & Roles' },
   { value: 'call-records', label: 'Call Records' },
   { value: 'action-items', label: 'Action Items' },
+  { value: 'complaints', label: 'Complaints' },
   { value: 'orders', label: 'Orders' },
   { value: 'incident-reports', label: 'Incident Reports' },
   { value: 'appointments', label: 'Appointments' },
+  { value: 'locations', label: 'Locations' },
   { value: 'knowledge-base', label: 'Knowledge Base' },
   { value: 'agent-settings', label: 'Agent Settings' },
   { value: 'usage-billing', label: 'Usage & Billing' },
-  { value: 'faqs', label: 'FAQs' },
-  { value: 'contact-support', label: 'Contact Support' },
 ]
-
-
-const PREDEFINED_ROLES = {
-  Administrator: {
-    is_admin: true,
-    features: AVAILABLE_FEATURES.map(f => f.value),
-  },
-  Manager: {
-    is_admin: false,
-    features: [
-      'call-records',
-      'action-items',
-      'orders',
-      'incident-reports',
-      'appointments',
-      'knowledge-base',
-      'usage-billing',
-      'users-roles',
-    ],
-  },
-  Agent: {
-    is_admin: false,
-    features: [
-      'call-records',
-      'action-items',
-      'orders',
-      'appointments',
-    ],
-  },
-  Viewer: {
-    is_admin: false,
-    features: [
-      'call-records',
-      'knowledge-base',
-    ],
-  },
-}
-
 
 type UserFormState = {
   email: string
@@ -76,14 +42,48 @@ const DEFAULT_FORM_STATE: UserFormState = {
   name: '',
   role_name: 'Agent',
   is_admin: false,
-  features: ['']
+  features: []
 }
 
 const UserManagementPage = () => {
   useFeatureGuard()
   const { token, user, isAuthenticated } = useAuth()
-  // const isAdmin = Boolean(isAuthenticated && user?.role === 'admin')
-  const isAdmin = 'true'
+  
+  // Get vertical-filtered features
+  const verticalKey = isOrgUser(user) ? user.organization?.vertical_key : undefined
+  const AVAILABLE_FEATURES = useMemo(
+    () => filterFeaturesByVertical(ALL_FEATURES, verticalKey),
+    [verticalKey]
+  )
+
+  // Update predefined roles based on vertical features
+  const PREDEFINED_ROLES = useMemo(() => ({
+    Administrator: {
+      is_admin: true,
+      features: AVAILABLE_FEATURES.map(f => f.value),
+    },
+    Manager: {
+      is_admin: false,
+      features: AVAILABLE_FEATURES
+        .filter(f => !['agent-settings', 'faqs', 'contact-support'].includes(f.value))
+        .map(f => f.value),
+    },
+    Agent: {
+      is_admin: false,
+      features: AVAILABLE_FEATURES
+        .filter(f => ['call-records', 'action-items', 'orders', 'appointments'].includes(f.value))
+        .map(f => f.value),
+    },
+    Viewer: {
+      is_admin: false,
+      features: AVAILABLE_FEATURES
+        .filter(f => ['call-records', 'knowledge-base'].includes(f.value))
+        .map(f => f.value),
+    },
+  }), [AVAILABLE_FEATURES])
+
+  const isAdmin = Boolean(isAuthenticated && user && isOrgUser(user) && user.is_admin)
+  
   const [users, setUsers] = useState<OrgUser[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
