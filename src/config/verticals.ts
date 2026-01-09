@@ -6,7 +6,7 @@
  */
 
 export type VerticalKey = 
-  | 'complaints' 
+  | 'complaint' 
   | 'food' 
   | 'ecommerce' 
   | 'hr' 
@@ -40,8 +40,8 @@ const COMMON_MENU_ITEMS = [
  * Vertical-specific configurations
  */
 export const VERTICAL_CONFIGS: Record<string, VerticalConfig> = {
-  complaints: {
-    key: 'complaints',
+  complaint: {
+    key: 'complaint',
     name: 'Complaint Organization',
     allowedMenuKeys: [
       ...COMMON_MENU_ITEMS,
