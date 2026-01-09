@@ -7,6 +7,13 @@
 
 import { apiClient } from './client'
 
+
+export interface TokenExchangeResponse {
+  access_token: string
+  expires_in: number
+  user_status: string
+}
+
 /**
  * Auth request/response types
  */
@@ -18,12 +25,6 @@ export interface SignInRequest {
 export interface SignInResponse {
   access_token: string
   expires_in: number
-}
-
-export interface TokenExchangeResponse {
-  access_token: string
-  expires_in: number
-  user_status: string
 }
 
 export interface OrgUserResponse {
@@ -71,9 +72,9 @@ export const authApi = {
   },
 
   /**
-   * NEW: Exchange Redirect Token
-   * POST /auth/org/token/exchange
-   */
+  * Exchange Redirect Token
+  * POST /auth/org/token/exchange
+  */
   async exchangeRedirectToken(redirectToken: string): Promise<TokenExchangeResponse> {
     return apiClient.post('/auth/org/token/exchange', { redirect_token: redirectToken })
   },

@@ -1,9 +1,25 @@
-// assistant-app/app/auth/callback/page.tsx
-
 'use client'
+
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Card, CardBody, Spinner, Alert } from 'react-bootstrap'
+import { authApi } from '@/api/auth'
+
+// Helper to clean MongoDB format
+function cleanMongoDBFormat(obj: any): any {
+  if (obj === null || obj === undefined) return obj
+  if (obj.$oid) return obj.$oid
+  if (obj.$date) return obj.$date
+  if (Array.isArray(obj)) return obj.map(item => cleanMongoDBFormat(item))
+  if (typeof obj === 'object') {
+    const cleaned: any = {}
+    for (const key in obj) {
+      cleaned[key] = cleanMongoDBFormat(obj[key])
+    }
+    return cleaned
+  }
+  return obj
+}
 
 export default function AuthCallback() {
   const router = useRouter()
@@ -15,70 +31,61 @@ export default function AuthCallback() {
     try {
       setStatus('Exchanging verification token...')
 
-      const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'https://api.company.com/api/v1'
+      // Step 1: Exchange token
+      const tokenResponse = await authApi.exchangeRedirectToken(redirectToken)
       
-      const response = await fetch(`${API_BASE_URL}/auth/org/token/exchange`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ redirect_token: redirectToken }),
-      })
+      console.log('✅ Token exchange response:', tokenResponse)
 
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ detail: 'Token exchange failed' }))
-        throw new Error(errorData.detail || 'Invalid or expired token')
-      }
-
-      const data = await response.json()
-
-      // Save auth data to localStorage
-      localStorage.setItem('access_token', data.access_token)
-      
-      const expiryTimestamp = Date.now() + (data.expires_in * 1000)
+      // Step 2: Save token immediately
+      localStorage.setItem('access_token', tokenResponse.access_token)
+      const expiryTimestamp = Date.now() + (tokenResponse.expires_in * 1000)
       localStorage.setItem('token_expires_at', expiryTimestamp.toString())
 
       setStatus('Loading your account...')
 
-      // Fetch user data
-      const userResponse = await fetch(`${API_BASE_URL}/auth/org/me`, {
-        headers: {
-          'Authorization': `Bearer ${data.access_token}`,
-        },
-      })
+      // Step 3: Fetch user data
+      const userResponse = await authApi.getCurrentOrgUser()
+      const cleanedUser = cleanMongoDBFormat(userResponse)
+      
+      console.log('✅ User data fetched:', cleanedUser)
 
-      if (!userResponse.ok) {
-        throw new Error('Failed to load user data')
+      // Step 4: Transform and save user
+      const userOut = {
+        actor: 'org' as const,
+        id: cleanedUser.org_user._id,
+        _id: cleanedUser.org_user._id,
+        email: cleanedUser.org_user.email,
+        name: cleanedUser.org_user.name,
+        org_id: cleanedUser.org_user.org_id,
+        is_admin: cleanedUser.org_user.is_admin,
+        role_name: cleanedUser.org_user.role_name,
+        role: cleanedUser.org_user.role_name || '',
+        status: cleanedUser.org_user.status,
+        features: cleanedUser.org_user.features || [],
+        organization: cleanedUser.organization || null,
       }
 
-      const userData = await userResponse.json()
-      localStorage.setItem('user', JSON.stringify({
-        actor: 'org',
-        id: userData.org_user._id,
-        email: userData.org_user.email,
-        name: userData.org_user.name,
-        org_id: userData.org_user.org_id,
-        is_admin: userData.org_user.is_admin,
-        role_name: userData.org_user.role_name,
-        status: userData.org_user.status,
-        features: userData.org_user.features,
-        organization: userData.organization || null,
-      }))
+      localStorage.setItem('user', JSON.stringify(userOut))
 
-      // Redirect based on user status
-      if (data.user_status === 'pending_onboard') {
+      console.log('✅ User saved to localStorage:', {
+        status: userOut.status,
+        hasOrg: !!userOut.org_id,
+      })
+
+      // Step 5: Redirect based on user status
+      if (tokenResponse.user_status === 'pending_onboard' || !cleanedUser.org_user.org_id) {
         setStatus('Redirecting to onboarding...')
-        router.push('/onboarding')
-      } else if (data.user_status === 'active') {
+        router.push('/onboarding?step=org')
+      } else if (tokenResponse.user_status === 'active') {
         setStatus('Redirecting to dashboard...')
         router.push('/dashboards')
       } else {
         throw new Error('Invalid user status')
       }
 
-    } catch (err) {
-      console.error('Token exchange error:', err)
-      setError(err instanceof Error ? err.message : 'Authentication failed')
+    } catch (err: any) {
+      console.error('❌ Token exchange error:', err)
+      setError(err?.response?.data?.detail || err.message || 'Authentication failed')
       setTimeout(() => router.push('/auth/sign-in'), 5000)
     }
   }, [router])
