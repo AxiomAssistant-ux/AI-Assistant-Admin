@@ -394,7 +394,7 @@ const PaymentStep = () => {
             </div>
             <div className="d-flex align-items-start gap-2">
               <span className="badge bg-primary text-white rounded-circle" style={{ width: '20px', height: '20px', fontSize: '10px' }}>2</span>
-              <span className="small text-muted">You'll become the organization admin</span>
+              <span className="small text-muted">You will come the organization admin</span>
             </div>
             <div className="d-flex align-items-start gap-2">
               <span className="badge bg-primary text-white rounded-circle" style={{ width: '20px', height: '20px', fontSize: '10px' }}>3</span>
