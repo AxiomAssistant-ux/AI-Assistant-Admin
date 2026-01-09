@@ -2,14 +2,16 @@
 
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
+import { useAuth } from '@/context/useAuthContext'
 import Image from 'next/image'
-import { Card, CardBody, Form, Button } from 'react-bootstrap'
+import { Card, CardBody, Form, Button, Alert } from 'react-bootstrap'
 import { useForm, Controller } from 'react-hook-form'
 import { yupResolver } from '@hookform/resolvers/yup'
 import * as yup from 'yup'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
+import { organizationsApi } from '@/api/org/organizations'
 
-// 1. Define the Schema FIRST
+// Schema - vertical_key will come from usecase step
 const schema = yup.object({
   companyName: yup
     .string()
@@ -25,8 +27,6 @@ const schema = yup.object({
   secondaryColor: yup.string().required('Secondary color is required'),
 }).required()
 
-// 2. Infer the type from the schema. 
-// This guarantees the Resolver and the Form Data match perfectly.
 type OrgFormData = yup.InferType<typeof schema>
 
 const industries = [
@@ -45,7 +45,9 @@ const industries = [
 
 const OrganizationStep = () => {
   const router = useRouter()
+  const { refreshUser } = useAuth()
   const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
 
   const { 
     handleSubmit, 
@@ -79,14 +81,15 @@ const OrganizationStep = () => {
 
   const onSubmit = async (data: OrgFormData) => {
     setLoading(true)
+    setError(null)
     
-    // Simulate API delay
-    await new Promise(resolve => setTimeout(resolve, 800))
-    
+    // Store org data in sessionStorage
     sessionStorage.setItem('onboarding_org', JSON.stringify(data))
     
+    // Move to use case step
+    await new Promise(resolve => setTimeout(resolve, 500))
     setLoading(false)
-    router.push('/onboarding?step=team')
+    router.push('/onboarding?step=usecase')
   }
 
   return (
@@ -106,6 +109,12 @@ const OrganizationStep = () => {
             Help us customize your experience by providing some basic information
           </p>
         </div>
+
+        {error && (
+          <Alert variant="danger" dismissible onClose={() => setError(null)} className="mb-4">
+            {error}
+          </Alert>
+        )}
 
         <Form onSubmit={handleSubmit(onSubmit)}>
           <Form.Group className="mb-3">

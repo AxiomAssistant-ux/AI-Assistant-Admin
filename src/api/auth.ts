@@ -1,4 +1,4 @@
-// assistant-app/api/auth.ts
+// /api/auth.ts
 
 /**
  * Authentication API

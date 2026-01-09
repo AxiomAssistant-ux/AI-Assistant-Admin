@@ -45,7 +45,7 @@ export interface OrgUser {
   is_admin: boolean
   role_name: string
   role: string
-  status: 'active' | 'invited' | 'suspended'
+  status: 'active' | 'invited' | 'suspended' | 'pending_onboard'
   features: string[]
   organization?: Organization
 }

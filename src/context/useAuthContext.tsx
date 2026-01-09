@@ -1,14 +1,13 @@
 /**
  * Auth Context
  * Manages authentication state for both org and platform users
- * 
- * FIXED: Properly parse MongoDB format from localStorage
+ * ADDED: Route protection based on user status
  */
 
 'use client'
 
 import React, { createContext, useContext, useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { authApi } from '@/api/auth'
 import type {
   UserOut,
@@ -26,12 +25,12 @@ const AUTH_STORAGE = {
     if (typeof window === 'undefined') return null
     return localStorage.getItem('access_token')
   },
-  
+
   getUser: (): UserOut | null => {
     if (typeof window === 'undefined') return null
     const userStr = localStorage.getItem('user')
     if (!userStr) return null
-    
+
     try {
       const parsed = JSON.parse(userStr)
       // Transform MongoDB format to clean format
@@ -41,37 +40,37 @@ const AUTH_STORAGE = {
       return null
     }
   },
-  
+
   getTokenExpiry: (): number | null => {
     if (typeof window === 'undefined') return null
     const expiry = localStorage.getItem('token_expires_at')
     return expiry ? parseInt(expiry) : null
   },
-  
+
   saveAuth: (token: string, user: UserOut, expiresIn: number) => {
     if (typeof window === 'undefined') return
-    
+
     localStorage.setItem('access_token', token)
     localStorage.setItem('user', JSON.stringify(user))
-    
+
     // Calculate expiry timestamp
     const expiryTimestamp = Date.now() + (expiresIn * 1000)
     localStorage.setItem('token_expires_at', expiryTimestamp.toString())
   },
-  
+
   saveToken: (token: string) => {
     if (typeof window === 'undefined') return
     localStorage.setItem('access_token', token)
   },
-  
+
   clearAuth: () => {
     if (typeof window === 'undefined') return
-    
+
     localStorage.removeItem('access_token')
     localStorage.removeItem('user')
     localStorage.removeItem('token_expires_at')
   },
-  
+
   isTokenExpired: (): boolean => {
     const expiry = AUTH_STORAGE.getTokenExpiry()
     if (!expiry) return true
@@ -85,22 +84,22 @@ const AUTH_STORAGE = {
 
 function cleanMongoDBFormat(obj: any): any {
   if (obj === null || obj === undefined) return obj
-  
+
   // Handle MongoDB ObjectId format: { $oid: "..." }
   if (obj.$oid) {
     return obj.$oid
   }
-  
+
   // Handle MongoDB Date format: { $date: "..." }
   if (obj.$date) {
     return obj.$date
   }
-  
+
   // Handle arrays
   if (Array.isArray(obj)) {
     return obj.map(item => cleanMongoDBFormat(item))
   }
-  
+
   // Handle objects
   if (typeof obj === 'object') {
     const cleaned: any = {}
@@ -109,7 +108,7 @@ function cleanMongoDBFormat(obj: any): any {
     }
     return cleaned
   }
-  
+
   return obj
 }
 
@@ -119,7 +118,7 @@ function cleanMongoDBFormat(obj: any): any {
 
 function transformOrgUserResponse(response: OrgUserResponse): UserOut {
   const cleaned = cleanMongoDBFormat(response)
-  
+
   return {
     actor: 'org',
     id: cleaned.org_user._id,
@@ -161,6 +160,30 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [token, setToken] = useState<string | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const router = useRouter()
+  const pathname = usePathname()
+
+  // ===============================
+  // Check user status and redirect
+  // ===============================
+  const checkUserStatus = (currentUser: UserOut, currentPath: string) => {
+    if (currentUser.actor !== 'org') return
+
+    const isPendingOnboard = currentUser.status === 'pending_onboard' || !currentUser.org_id
+    const isOnboardingPage = currentPath?.startsWith('/onboarding')
+    const isAuthPage = currentPath?.startsWith('/auth')
+
+    // If pending onboard and not on onboarding/auth pages, redirect to onboarding
+    if (isPendingOnboard && !isOnboardingPage && !isAuthPage) {
+      console.log('🔄 User needs onboarding, redirecting...')
+      router.push('/onboarding?step=org')
+    }
+
+    // If active user on onboarding page, redirect to dashboard
+    if (!isPendingOnboard && isOnboardingPage) {
+      console.log('✅ User already onboarded, redirecting to dashboard...')
+      router.push('/dashboards')
+    }
+  }
 
   // ===============================
   // Initialize from storage
@@ -173,13 +196,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('🔍 Initializing auth from storage:', {
         hasToken: !!storedToken,
         hasUser: !!storedUser,
-        verticalKey: storedUser?.actor === 'org' ? storedUser.organization?.vertical_key : undefined,
-        features: storedUser?.actor === 'org' ? storedUser.features : undefined,
+        status: storedUser?.actor === 'org' ? storedUser.status : undefined,
+        has_org: storedUser?.actor === 'org' ? !!storedUser.org_id : undefined,
       })
 
       if (storedToken && storedUser && !AUTH_STORAGE.isTokenExpired()) {
         setToken(storedToken)
         setUser(storedUser)
+
+        // Check if user needs to complete onboarding
+        checkUserStatus(storedUser, pathname || '')
       } else {
         AUTH_STORAGE.clearAuth()
       }
@@ -188,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     initAuth()
-  }, [])
+  }, [pathname])
 
   // ===============================
   // Sign In
@@ -201,74 +227,81 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setIsLoading(true)
 
       if (isPlatform) {
-        return { 
-          success: false, 
-          error: 'Platform admin sign in not yet implemented. Please use org sign in.' 
+        return {
+          success: false,
+          error: 'Platform admin sign in not yet implemented. Please use org sign in.'
         }
       }
 
       // Step 1: Sign in and get token
       const signInResponse = await authApi.orgSignIn(data)
-      
+
       // Step 2: Save token immediately
       AUTH_STORAGE.saveToken(signInResponse.access_token)
-      
+
       console.log('✅ Token saved to localStorage')
-      
+
       // Step 3: Get current user data
       const userResponse = await authApi.getCurrentOrgUser()
-      
+
       // Step 4: Transform to UserOut (with MongoDB cleanup)
       const userOut = transformOrgUserResponse(userResponse as any)
-      
-      console.log('✅ User data transformed:', {
-        actor: userOut.actor,
-        name: userOut.name,
-        isAdmin: userOut.actor === 'org' ? userOut.is_admin : undefined,
-        verticalKey: userOut.actor === 'org' ? userOut.organization?.vertical_key : undefined,
-        features: userOut.actor === 'org' ? userOut.features : undefined,
-      })
-      
+
+      if (userOut.actor === 'org') {
+        console.log('✅ User data transformed:', {
+          actor: userOut.actor,
+          name: userOut.name,
+          status: userOut.status,
+          has_org: !!userOut.org_id,
+        })
+      }
+
       // Step 5: Save complete auth data
       AUTH_STORAGE.saveAuth(
         signInResponse.access_token,
         userOut,
         signInResponse.expires_in
       )
-      
+
       // Step 6: Update state
       setToken(signInResponse.access_token)
       setUser(userOut)
 
-      // Step 7: Redirect
-      const redirectPath = '/dashboards'
-      
-      console.log('✅ Sign In Success:', {
-        actor: userOut.actor,
-        user: userOut.name,
-        org: userOut.actor === 'org' ? userOut.organization?.company_name : undefined,
-        redirectPath,
-      })
+      // Step 7: Redirect based on user status
+      const isPendingOnboard =
+        userOut.actor === 'org' &&
+        (userOut.status === 'pending_onboard' || !userOut.org_id)
+      const redirectPath = isPendingOnboard ? '/onboarding?step=org' : '/dashboards'
+
+      if (userOut.actor === 'org') {
+        console.log('✅ Sign In Success:', {
+          actor: userOut.actor,
+          user: userOut.name,
+          status: userOut.status,
+          has_org: !!userOut.org_id,
+          redirectPath,
+        })
+      }
 
       router.push(redirectPath)
 
       return { success: true }
     } catch (error: any) {
       console.error('❌ Sign in error:', error)
-      
+
       AUTH_STORAGE.clearAuth()
-      
+
       let errorMessage = 'An error occurred during sign in'
-      
+
       if (error.response?.data?.detail) {
         errorMessage = error.response.data.detail
       } else if (error.message) {
         errorMessage = error.message
       }
-      
-      return { 
-        success: false, 
-        error: errorMessage 
+
+      return {
+        success: false,
+        error: errorMessage
       }
     } finally {
       setIsLoading(false)
@@ -280,15 +313,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ===============================
   const signOut = () => {
     const actor = user?.actor
-    
+
     AUTH_STORAGE.clearAuth()
     setToken(null)
     setUser(null)
-    
-    const redirectPath = actor === 'platform' 
-      ? '/auth/admin/sign-in' 
+
+    const redirectPath = actor === 'platform'
+      ? '/auth/admin/sign-in'
       : '/auth/sign-in'
-    
+
     router.push(redirectPath)
   }
 
@@ -303,18 +336,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (user.actor === 'org') {
         const userResponse = await authApi.getCurrentOrgUser()
         const refreshedUser = transformOrgUserResponse(userResponse as any)
-        
+
+
         // console.log('🔄 User refreshed:', {
-        //   verticalKey: refreshedUser.organization?.vertical_key,
-        //   features: refreshedUser.features,
+        //   status: refreshedUser.status,
+        //   has_org: !!refreshedUser.org_id,
         // })
-        
+
         setUser(refreshedUser)
         AUTH_STORAGE.saveAuth(
           currentToken,
           refreshedUser,
           3600 // Default 1 hour
         )
+
+        // Check status after refresh
+        checkUserStatus(refreshedUser, pathname || '')
       }
     } catch (error) {
       console.error('Error refreshing user:', error)

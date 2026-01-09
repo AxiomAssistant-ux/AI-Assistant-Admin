@@ -3,7 +3,6 @@
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
 import OrganizationStep from './steps/OrganizationStep'
-import TeamSetupStep from './steps/TeamSetupStep'
 import UseCaseStep from './steps/UseCaseStep'
 import PricingPlansStep from './steps/PricingPlansStep'
 import PaymentStep from './steps/PaymentStep'
@@ -16,8 +15,6 @@ const OnboardingContent = () => {
     switch (step) {
       case 'org':
         return <OrganizationStep />
-      case 'team':
-        return <TeamSetupStep />
       case 'usecase':
         return <UseCaseStep />
       case 'plan':
