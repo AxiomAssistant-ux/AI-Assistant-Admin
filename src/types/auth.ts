@@ -9,6 +9,13 @@ export interface SignInRequest {
   password: string
 }
 
+export interface SignUpRequest {
+  email: string
+  password: string
+  name: string
+  organization_name?: string
+}
+
 export interface Organization {
   _id: string
   company_name: string
