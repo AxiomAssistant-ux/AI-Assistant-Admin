@@ -613,7 +613,7 @@ const UserManagementPage = () => {
                 <li className="breadcrumb-item active">Users</li>
               </ol>
             </div>
-            {/* <Button
+            <Button
               variant="primary"
               onClick={openCreateModal}
               disabled={!isAdmin}
@@ -621,7 +621,7 @@ const UserManagementPage = () => {
             >
               <IconifyIcon icon="solar:user-plus-linear" width={20} height={20} />
               Invite User
-            </Button> */}
+            </Button>
           </div>
         </Col>
       </Row>

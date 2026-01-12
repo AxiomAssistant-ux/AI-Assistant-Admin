@@ -51,6 +51,25 @@ export interface OrgUserResponse {
   }
 }
 
+export interface VerifyInvitationResponse {
+  email: string
+  name: string
+  organization_name: string
+  valid: boolean
+}
+
+export interface AcceptInvitationRequest {
+  invite_token: string
+  new_password: string
+  confirm_password: string
+}
+
+export interface AcceptInvitationResponse {
+  access_token: string
+  expires_in: number
+  message: string
+}
+
 /**
  * Authentication API endpoints
  */
@@ -121,4 +140,23 @@ export const authApi = {
       new_password: newPassword,
     })
   },
+
+  /**
+   * Verify Invitation Token
+   * POST /auth/org/verify-invitation
+   */
+  async verifyInvitation(inviteToken: string): Promise<VerifyInvitationResponse> {
+    return apiClient.post('/auth/org/verify-invitation', { invite_token: inviteToken })
+  },
+
+  /**
+   * Accept Invitation & Set Password
+   * POST /auth/org/accept-invitation
+   */
+  async acceptInvitation(data: AcceptInvitationRequest): Promise<AcceptInvitationResponse> {
+    return apiClient.post('/auth/org/accept-invitation', data)
+  },
+
+
+  
 }
