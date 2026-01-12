@@ -30,6 +30,8 @@ export interface CompleteOnboardingRequest {
 }
 
 export interface CompleteOnboardingResponse {
+  access_token: any
+  expires_in: number
   message: string
   organization: Organization
 }

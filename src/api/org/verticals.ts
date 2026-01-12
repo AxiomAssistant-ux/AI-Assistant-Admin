@@ -10,26 +10,25 @@ export interface Vertical {
   description: string
 }
 
-export interface VerticalsResponse {
-  verticals: Vertical[]
-}
-
 export const verticalsApi = {
   /**
-   * Get all available verticals
+   * Get all verticals
    * GET /org/verticals
+   * No authentication required
    */
   async getAll(): Promise<Vertical[]> {
-    const response = await axios.get<VerticalsResponse>(`${API_BASE}/org/verticals`)
-    return response.data.verticals
+    const response = await axios.get(`${API_BASE}/org/verticals`)
+    // Response is now a direct array
+    return response.data
   },
 
   /**
    * Get a specific vertical by key
-   * GET /org/verticals/:key
+   * GET /org/verticals/{vertical_key}
+   * No authentication required
    */
   async getByKey(key: string): Promise<Vertical> {
-    const response = await axios.get<Vertical>(`${API_BASE}/org/verticals/${key}`)
+    const response = await axios.get(`${API_BASE}/org/verticals/${key}`)
     return response.data
   },
 }

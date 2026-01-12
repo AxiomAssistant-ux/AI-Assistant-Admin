@@ -269,14 +269,26 @@ const PaymentStep = () => {
 
       const orgData = JSON.parse(orgDataStr)
       
-      // Call backend to complete onboarding
-      await organizationsApi.completeOnboarding({
+      // Call backend to complete onboarding - returns NEW TOKEN
+      const response = await organizationsApi.completeOnboarding({
         company_name: orgData.companyName,
         industry: orgData.industry,
         vertical_key: verticalKey,
         logo_url: orgData.logoUrl || undefined,
         color_scheme: [orgData.primaryColor, orgData.secondaryColor],
       })
+
+      console.log('✅ Onboarding completed:', response)
+
+      // CRITICAL: Save new token with org_id
+      if (response.access_token) {
+        console.log('🔑 Saving new token with org_id')
+        localStorage.setItem('access_token', response.access_token)
+        
+        // Calculate and save expiry
+        const expiryTimestamp = Date.now() + (response.expires_in * 1000)
+        localStorage.setItem('token_expires_at', expiryTimestamp.toString())
+      }
 
       // Clear sessionStorage
       sessionStorage.removeItem('onboarding_org')
