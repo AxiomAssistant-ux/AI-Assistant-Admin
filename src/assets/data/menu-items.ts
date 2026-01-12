@@ -142,12 +142,12 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     icon: 'solar:widget-2-outline',
     url: '/dashboards',
   },
-  {
-    key: 'agent',
-    label: 'Call Assistant',
-    icon: 'solar:face-scan-square-broken',
-    url: '/agent',
-  },
+  // {
+  //   key: 'agent',
+  //   label: 'Call Assistant',
+  //   icon: 'solar:face-scan-square-broken',
+  //   url: '/agent',
+  // },
   {
     key: 'users-roles',
     label: 'User Management',
