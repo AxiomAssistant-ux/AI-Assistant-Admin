@@ -19,7 +19,7 @@ export const verticalsApi = {
   async getAll(): Promise<Vertical[]> {
     const response = await axios.get(`${API_BASE}/org/verticals`)
     // Response is now a direct array
-    return response.data
+    return response.data.verticals
   },
 
   /**
