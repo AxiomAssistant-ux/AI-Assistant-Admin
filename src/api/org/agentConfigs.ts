@@ -1,4 +1,4 @@
-// src/api/org/agents.ts - UNIFIED BACKEND VERSION
+// src/api/org/agentConfigs.ts
 import axios from 'axios'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1'
@@ -6,7 +6,20 @@ const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/
 // ===== TYPES =====
 
 export type ConfigStatus = 'pending_review' | 'approved' | 'rejected' | 'active'
-export type SyncStatus = 'not_synced' | 'syncing' | 'synced' | 'failed'
+export type KnowledgeBaseStatus = 'draft' | 'pending_sync' | 'synced' | 'failed'
+
+export interface AgentConfig {
+  id: string
+  org_id: string
+  name: string
+  status: ConfigStatus
+  configuration: AgentConfiguration
+  retell_agent_id: string | null
+  retell_phone_number: string | null
+  retell_agent_name: string | null
+  created_at: string
+  updated_at: string
+}
 
 export interface AgentConfiguration {
   branding: BrandingConfig
@@ -104,58 +117,31 @@ export interface TrainingConfig {
   sample_dialogues: string[]
 }
 
-export interface AgentConfig {
-  id: string
-  org_id: string
-  name: string
-  status: ConfigStatus
-  configuration: AgentConfiguration
-  retell_agent_id: string | null
-  agent_assigned: boolean
-  created_at: string
-  updated_at: string
-  admin_notes?: string
-  rejection_reason?: string
-  reviewed_at?: string
-  reviewed_by?: string
-}
-
-export interface AgentStatus {
-  has_config: boolean
-  status: ConfigStatus | null
-  agent_assigned: boolean
-  can_upload_kb: boolean
-  retell_agent_id: string | null
-  message: string
-}
-
 export interface KnowledgeBase {
   id: string
+  agent_config_id: string
   org_id: string
-  retell_agent_id: string
   name: string
   description: string
   file_name: string
   file_url: string
   file_size: number
   file_type: string
+  status: KnowledgeBaseStatus
   enabled: boolean
-  sync_status: SyncStatus
-  synced_at: string | null
-  sync_error: string | null
-  retell_kb_id: string | null
   created_at: string
   updated_at: string
+  synced_at?: string
 }
 
-export interface CreateConfigRequest {
+export interface CreateAgentConfigRequest {
   name: string
   configuration: AgentConfiguration
 }
 
-export interface UpdateConfigRequest {
+export interface UpdateAgentConfigRequest {
   name?: string
-  configuration?: AgentConfiguration
+  configuration?: Partial<AgentConfiguration>
 }
 
 export interface CreateKnowledgeBaseRequest {
@@ -167,6 +153,7 @@ export interface CreateKnowledgeBaseRequest {
 export interface UpdateKnowledgeBaseRequest {
   name?: string
   description?: string
+  enabled?: boolean
 }
 
 export interface QuickSetupAnswers {
@@ -188,11 +175,6 @@ export interface ParsedAgentConfig {
   suggestions?: string[]
 }
 
-export interface KnowledgeBaseListResponse {
-  items: KnowledgeBase[]
-  total: number
-}
-
 // ===== API CLIENT =====
 
 const getAuthHeaders = () => {
@@ -200,84 +182,52 @@ const getAuthHeaders = () => {
   return token ? { Authorization: `Bearer ${token}` } : {}
 }
 
-export const agentsApi = {
-  // ===== AGENT CONFIG ENDPOINTS =====
-
-  /**
-   * Get organization's agent configuration
-   */
-  async getConfig(): Promise<AgentConfig> {
-    const response = await axios.get(`${API_BASE}/org/agents/config`, {
+export const agentConfigsApi = {
+  // Agent Config Management
+  async getOrganizationAgentConfig(): Promise<AgentConfig> {
+    const response = await axios.get(`${API_BASE}/org/agent-configs/current`, {
       headers: getAuthHeaders()
     })
     return response.data
   },
 
-  /**
-   * Get agent setup status
-   */
-  async getStatus(): Promise<AgentStatus> {
-    const response = await axios.get(`${API_BASE}/org/agents/status`, {
+  async createAgentConfig(data: CreateAgentConfigRequest): Promise<AgentConfig> {
+    const response = await axios.post(`${API_BASE}/org/agent-configs`, data, {
       headers: getAuthHeaders()
     })
     return response.data
   },
 
-  /**
-   * Create agent configuration
-   */
-  async createConfig(data: CreateConfigRequest): Promise<AgentConfig> {
-    const response = await axios.post(`${API_BASE}/org/agents/config`, data, {
+  async updateAgentConfig(configId: string, data: UpdateAgentConfigRequest): Promise<{ message: string }> {
+    const response = await axios.patch(`${API_BASE}/org/agent-configs/${configId}`, data, {
       headers: getAuthHeaders()
     })
     return response.data
   },
 
-  /**
-   * Update agent configuration
-   */
-  async updateConfig(configuration: AgentConfiguration): Promise<{ message: string }> {
-    const response = await axios.patch(
-      `${API_BASE}/org/agents/config`,
-      { configuration },
-      { headers: getAuthHeaders() }
-    )
-    return response.data
-  },
-
-  // ===== KNOWLEDGE BASE ENDPOINTS =====
-
-  /**
-   * List knowledge bases
-   */
-  async listKnowledgeBases(): Promise<KnowledgeBaseListResponse> {
-    const response = await axios.get(`${API_BASE}/org/agents/knowledge-bases`, {
+  async updateConfiguration(configId: string, config: Partial<AgentConfiguration>): Promise<{ message: string }> {
+    const response = await axios.patch(`${API_BASE}/org/agent-configs/${configId}/configuration`, config, {
       headers: getAuthHeaders()
     })
     return response.data
   },
 
-  /**
-   * Get specific knowledge base
-   */
-  async getKnowledgeBase(kbId: string): Promise<KnowledgeBase> {
-    const response = await axios.get(`${API_BASE}/org/agents/knowledge-bases/${kbId}`, {
+  // Knowledge Base Management
+  async listKnowledgeBases(configId: string): Promise<KnowledgeBase[]> {
+    const response = await axios.get(`${API_BASE}/org/agent-configs/${configId}/knowledge-bases`, {
       headers: getAuthHeaders()
     })
     return response.data
   },
 
-  /**
-   * Upload knowledge base (creates disabled by default)
-   */
-  async createKnowledgeBase(data: CreateKnowledgeBaseRequest): Promise<KnowledgeBase> {
+  async createKnowledgeBase(configId: string, data: CreateKnowledgeBaseRequest): Promise<KnowledgeBase> {
     const formData = new FormData()
     formData.append('name', data.name)
     formData.append('description', data.description)
     formData.append('file', data.file)
 
     const response = await axios.post(
-      `${API_BASE}/org/agents/knowledge-bases`,
+      `${API_BASE}/org/agent-configs/${configId}/knowledge-bases`,
       formData,
       {
         headers: {
@@ -289,82 +239,57 @@ export const agentsApi = {
     return response.data
   },
 
-  /**
-   * Update knowledge base metadata
-   */
-  async updateKnowledgeBase(kbId: string, data: UpdateKnowledgeBaseRequest): Promise<{ message: string }> {
+  async updateKnowledgeBase(
+    configId: string,
+    kbId: string,
+    data: UpdateKnowledgeBaseRequest
+  ): Promise<{ message: string }> {
     const response = await axios.patch(
-      `${API_BASE}/org/agents/knowledge-bases/${kbId}`,
+      `${API_BASE}/org/agent-configs/${configId}/knowledge-bases/${kbId}`,
       data,
       { headers: getAuthHeaders() }
     )
     return response.data
   },
 
-  /**
-   * Delete knowledge base
-   */
-  async deleteKnowledgeBase(kbId: string): Promise<{ message: string }> {
-    const response = await axios.delete(
-      `${API_BASE}/org/agents/knowledge-bases/${kbId}`,
-      { headers: getAuthHeaders() }
-    )
-    return response.data
+  async deleteKnowledgeBase(configId: string, kbId: string): Promise<void> {
+    await axios.delete(`${API_BASE}/org/agent-configs/${configId}/knowledge-bases/${kbId}`, {
+      headers: getAuthHeaders()
+    })
   },
 
-  /**
-   * Enable knowledge base (sync to Retell agent)
-   */
-  async enableKnowledgeBase(kbId: string): Promise<{ message: string }> {
+  async syncKnowledgeBase(configId: string, kbId: string): Promise<{ message: string }> {
     const response = await axios.post(
-      `${API_BASE}/org/agents/knowledge-bases/${kbId}/enable`,
+      `${API_BASE}/org/agent-configs/${configId}/knowledge-bases/${kbId}/sync`,
       {},
-      { headers: getAuthHeaders() }
-    )
-    return response.data
-  },
-
-  /**
-   * Disable knowledge base (remove from Retell agent)
-   */
-  async disableKnowledgeBase(kbId: string): Promise<{ message: string }> {
-    const response = await axios.post(
-      `${API_BASE}/org/agents/knowledge-bases/${kbId}/disable`,
-      {},
-      { headers: getAuthHeaders() }
-    )
-    return response.data
-  },
-
-  // ===== AI CONFIG GENERATION ENDPOINTS =====
-
-  /**
-   * Generate config from structured quick setup answers
-   */
-  async generateFromAnswers(answers: QuickSetupAnswers): Promise<ParsedAgentConfig> {
-    const response = await axios.post(
-      `${API_BASE}/org/agents/generate-config`,
-      answers,
-      { headers: getAuthHeaders() }
-    )
-    return response.data
-  },
-
-  /**
-   * Parse natural language description into full agent configuration
-   */
-  async parseFromDescription(description: string): Promise<ParsedAgentConfig> {
-    const response = await axios.post(
-      `${API_BASE}/org/agents/parse-config`,
-      { description },
       { headers: getAuthHeaders() }
     )
     return response.data
   }
 }
 
-// Export for backwards compatibility
 export const agentConfigApi = {
-  parseFromDescription: agentsApi.parseFromDescription,
-  generateFromAnswers: agentsApi.generateFromAnswers
+  /**
+   * Parse natural language description into full agent configuration
+   */
+  async parseFromDescription(description: string): Promise<ParsedAgentConfig> {
+    const response = await axios.post(
+      `${API_BASE}/org/agent-configs/parse-config`,
+      { description },
+      { headers: getAuthHeaders() }
+    )
+    return response.data
+  },
+
+  /**
+   * Generate config from structured quick setup answers
+   */
+  async generateFromAnswers(answers: QuickSetupAnswers): Promise<ParsedAgentConfig> {
+    const response = await axios.post(
+      `${API_BASE}/org/agent-configs/generate-config`,
+      answers,
+      { headers: getAuthHeaders() }
+    )
+    return response.data
+  }
 }
