@@ -582,9 +582,9 @@ export const TrainingStep: React.FC<any> = ({ config, updateConfig }) => (
         <Alert variant="success">
           <strong>Default Tone Examples:</strong>
           <ul className="mb-0 mt-2 small">
-            <li>"I understand — let me help you with that right away."</li>
-            <li>"Thanks for your patience. I'm checking the details now."</li>
-            <li>"To keep your account secure, I'll need to verify a couple of details."</li>
+            <li>{"I understand — let me help you with that right away."}</li>
+            <li>{"Thanks for your patience. I'm checking the details now."}</li>
+            <li>{"To keep your account secure, I'll need to verify a couple of details."}</li>
           </ul>
         </Alert>
       </Col>

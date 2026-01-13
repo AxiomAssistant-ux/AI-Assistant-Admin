@@ -6,7 +6,7 @@
 
 'use client'
 
-import React, { createContext, useContext, useEffect, useState } from 'react'
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import { authApi } from '@/api/auth'
 import type {
@@ -165,7 +165,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   // ===============================
   // Check user status and redirect
   // ===============================
-  const checkUserStatus = (currentUser: UserOut, currentPath: string) => {
+  const checkUserStatus = useCallback((currentUser: UserOut, currentPath: string) => {
     if (currentUser.actor !== 'org') return
 
     const isPendingOnboard = currentUser.status === 'pending_onboard' || !currentUser.org_id
@@ -183,7 +183,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       console.log('✅ User already onboarded, redirecting to dashboard...')
       router.push('/dashboards')
     }
-  }
+  },[router])
 
   // ===============================
   // Initialize from storage
@@ -214,7 +214,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     initAuth()
-  }, [pathname])
+  }, [pathname, checkUserStatus])
 
   // ===============================
   // Sign In

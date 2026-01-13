@@ -176,7 +176,7 @@ export const QuickSetupWizard: React.FC<QuickSetupWizardProps> = ({
           <Col md={12}>
             <Form.Group>
               <Form.Label>
-                1. What's your company/business name? <span className="text-danger">*</span>
+                1. What is your company/business name? <span className="text-danger">*</span>
               </Form.Label>
               <Form.Control
                 value={answers.company_name}
@@ -212,7 +212,7 @@ export const QuickSetupWizard: React.FC<QuickSetupWizardProps> = ({
           <Col md={6}>
             <Form.Group>
               <Form.Label>
-                3. What's your primary service/product? <span className="text-danger">*</span>
+                3. What is your primary service/product? <span className="text-danger">*</span>
               </Form.Label>
               <Form.Control
                 value={answers.primary_service}
@@ -331,7 +331,7 @@ We have 3 store locations and delivery takes 30-45 minutes typically.`}
         />
         <Form.Text className="text-muted">
           Minimum 50 characters. Include: what your business does, what the agent should handle, 
-          what it shouldn't do, your tone preferences, and any special rules.
+          what it should not do, your tone preferences, and any special rules.
         </Form.Text>
       </Form.Group>
     </div>

@@ -548,7 +548,7 @@ const AgentPage = () => {
                     <IconifyIcon icon="solar:book-linear" width={48} height={48} className="text-muted mb-3" />
                     <h6 className="text-muted">No Knowledge Bases Yet</h6>
                     <p className="text-muted small mb-3">
-                      Upload documents to enhance your agent's knowledge
+                      Upload documents to enhance your agent knowledge
                     </p>
                     <p className="text-muted small mb-0">
                       <IconifyIcon icon="solar:info-circle-linear" width={16} className="me-1" />
