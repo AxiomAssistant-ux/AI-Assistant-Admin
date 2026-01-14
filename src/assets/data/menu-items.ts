@@ -159,12 +159,14 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     label: 'Action Items',
     icon: 'solar:checklist-outline',
     url: '/action-items',
+    badge: { variant: 'danger', text: '3' },
   },
   {
     key: 'call-records',
     label: 'Call Records',
     icon: 'solar:call-chat-outline',
     url: '/call-records',
+    badge: { variant: 'warning', text: '3' },
   },
   {
     key: 'complaints',

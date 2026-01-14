@@ -55,6 +55,9 @@ const CallRecordsPage = () => {
   const [hasAutoOpened, setHasAutoOpened] = useState(false)
   const [openedFromComplaints, setOpenedFromComplaints] = useState(false)
 
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+
+
   // const { isConnected: realtimeConnected } = useRealtime()
   // useCallLogUpdates({
   //   onCallLogCreated: handleCallLogCreated
@@ -209,7 +212,7 @@ const CallRecordsPage = () => {
     // Refresh call logs to show new data
     fetchCallLogs()
   }, [fetchCallLogs]);
-  
+
   // ===== REAL-TIME UPDATES =====
   // const { isConnected: realtimeConnected } = useRealtimeUpdates({
   //   onCallLogCreated: handleCallLogCreated,
@@ -364,7 +367,7 @@ const CallRecordsPage = () => {
         key: 'rowNumber',
         header: '#',
         width: 60,
-        align: 'center',
+        align: 'left',
         render: (_, { rowIndex }) => (
           <span className="text-muted">{startIndex + rowIndex + 1}</span>
         )
@@ -372,7 +375,7 @@ const CallRecordsPage = () => {
       {
         key: 'caller',
         header: 'Caller',
-        minWidth: 200,
+        minWidth: 150,
         render: (call) => (
           <div>
             <div className="fw-semibold">{call.caller.name}</div>
@@ -408,7 +411,7 @@ const CallRecordsPage = () => {
       {
         key: 'timing',
         header: 'Call Time',
-        minWidth: 180,
+        minWidth: 150,
         render: (call) => (
           <div>
             <div className="small">{formatDateTime(call.call_timing.started_at)}</div>
@@ -421,11 +424,11 @@ const CallRecordsPage = () => {
       {
         key: 'summary',
         header: 'Summary',
-        minWidth: 300,
+        minWidth: 350,
         render: (call) => (
           <div
             className="text-truncate"
-            style={{ maxWidth: '300px' }}
+            style={{ maxWidth: '350px' }}
             title={call.summaries.brief}
           >
             {call.summaries.brief}
@@ -436,7 +439,7 @@ const CallRecordsPage = () => {
         key: 'success',
         header: 'Status',
         width: 100,
-        align: 'center',
+        align: 'left',
         render: (call) => (
           <Badge bg={call.call_success ? 'success' : 'danger'}>
             {call.call_success ? 'Success' : 'Failed'}
@@ -447,7 +450,7 @@ const CallRecordsPage = () => {
         key: 'view_status',
         header: 'Read',
         width: 100,
-        align: 'center',
+        align: 'left',
         sticky: 'right',
         defaultSticky: true,
         render: (call) => (
@@ -456,19 +459,19 @@ const CallRecordsPage = () => {
           </Badge>
         )
       },
-      {
-        key: 'action_flag',
-        header: 'Action',
-        width: 100,
-        align: 'center',
-        sticky: 'right',
-        defaultSticky: true,
-        render: (call) => (
-          <Badge bg={call.action_flag ? 'danger' : 'secondary'}>
-            {call.action_flag ? 'Required' : 'None'}
-          </Badge>
-        )
-      },
+      // {
+      //   key: 'action_flag',
+      //   header: 'Action',
+      //   width: 100,
+      //   align: 'center',
+      //   sticky: 'right',
+      //   defaultSticky: true,
+      //   render: (call) => (
+      //     <Badge bg={call.action_flag ? 'danger' : 'secondary'}>
+      //       {call.action_flag ? 'Required' : 'None'}
+      //     </Badge>
+      //   )
+      // },
       {
         key: 'actions',
         header: 'Actions',
@@ -477,7 +480,7 @@ const CallRecordsPage = () => {
         sticky: 'right',
         defaultSticky: true,
         render: (call) => (
-          <div className="d-flex gap-2 justify-content-center">
+          <div className="d-flex gap-2 justify-content-left">
             <Button
               variant="outline-primary"
               size="sm"
@@ -486,20 +489,26 @@ const CallRecordsPage = () => {
             >
               <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
             </Button>
-            {call.recording_link && (
-              <Button
-                variant="outline-success"
-                size="sm"
-                href={call.recording_link}
-                target="_blank"
-                rel="noopener noreferrer"
-                title="Play Recording"
-              >
-                <IconifyIcon icon="solar:play-linear" width={16} height={16} />
-              </Button>
-            )}
+
+            <Button
+              variant={call.recording_link ? "outline-success" : "outline-secondary"}
+              size="sm"
+              href={call.recording_link || undefined}
+              target={call.recording_link ? "_blank" : undefined}
+              rel={call.recording_link ? "noopener noreferrer" : undefined}
+              disabled={!call.recording_link}
+              title={call.recording_link ? "Play Recording" : "Recording not available"}
+              style={{
+                pointerEvents: call.recording_link ? "auto" : "none",
+                opacity: call.recording_link ? 1 : 0.45,
+                cursor: call.recording_link ? "pointer" : "not-allowed",
+              }}
+            >
+              <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+            </Button>
           </div>
         )
+
       }
     ],
     [startIndex, handleViewDetails]
@@ -587,19 +596,28 @@ const CallRecordsPage = () => {
             </div>
 
             {/* Real-time connection indicator */}
-            {realtimeConnected && (
-              <Badge bg="success" className="d-flex gap-1 px-3 py-2">
+            {/* {realtimeConnected && (
+              <div
+                className="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill"
+                style={{
+                  background: '#E9F7EF',
+                  border: '1px solid #B7E4C7',
+                  fontSize: 13
+                }}
+              >
                 <span
-                  className="rounded-circle bg-white"
+                  className="rounded-circle"
                   style={{
-                    width: 6,
-                    height: 6,
-                    animation: 'pulse 2s ease-in-out infinite'
+                    width: 8,
+                    height: 8,
+                    background: '#cc2e2eff',
+                    animation: 'pulse 1.6s ease-in-out infinite'
                   }}
                 />
-                <span className="fw-semibold">Live Updates</span>
-              </Badge>
-            )}
+                <span className="text-success">Live Updates</span>
+              </div>
+            )} */}
+
             {/* </div> */}
           </div>
         </Col>
@@ -899,7 +917,7 @@ const CallRecordsPage = () => {
                       </Badge>
                     </Col>
                   </Row>
-                  <Row className="g-3">
+                  {/* <Row className="g-3">
                     <Col xs={12}>
                       <small className="text-muted d-block">Conversation ID</small>
                       <code className="small">{selectedCall.conversation_id}</code>
@@ -908,7 +926,7 @@ const CallRecordsPage = () => {
                       <small className="text-muted d-block">Agent ID</small>
                       <code className="small">{selectedCall.agent_id}</code>
                     </Col>
-                  </Row>
+                  </Row> */}
                 </Card.Body>
               </Card>
 

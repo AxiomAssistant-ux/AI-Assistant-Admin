@@ -272,7 +272,7 @@ const ComplaintsPage = () => {
         key: 'rowNumber',
         header: '#',
         width: 60,
-        align: 'center',
+        align: 'left',
         render: (_, { rowIndex }) => (
           <span className="text-muted">{startIndex + rowIndex + 1}</span>
         )
@@ -280,7 +280,7 @@ const ComplaintsPage = () => {
       {
         key: 'customer',
         header: 'Customer',
-        minWidth: 200,
+        minWidth: 130,
         render: (complaint) => (
           <div>
             <div className="fw-semibold">{complaint.customer.customer_name || 'N/A'}</div>
@@ -322,7 +322,7 @@ const ComplaintsPage = () => {
         render: (complaint) => (
           <div>
             <div className="small fw-semibold">{complaint.complaint_type || 'N/A'}</div>
-            {complaint.receipt_status && (
+            {complaint.receipt_status !== 'unknown' && (
               <Badge bg="info" className="mt-1">
                 Receipt: {complaint.receipt_status}
               </Badge>
@@ -348,7 +348,7 @@ const ComplaintsPage = () => {
         key: 'severity',
         header: 'Severity',
         width: 120,
-        align: 'center',
+        align: 'left',
         render: (complaint) => (
           <Badge bg={getSeverityBadgeColor(complaint.complaint_severity)}>
             {complaint.complaint_severity?.toUpperCase() || 'N/A'}
@@ -359,7 +359,7 @@ const ComplaintsPage = () => {
         key: 'status',
         header: 'Status',
         width: 120,
-        align: 'center',
+        align: 'left',
         sticky: 'right',
         defaultSticky: true,
         render: (complaint) => (
@@ -372,7 +372,7 @@ const ComplaintsPage = () => {
         key: 'escalation',
         header: 'Escalation',
         width: 120,
-        align: 'center',
+        align: 'left',
         sticky: 'right',
         defaultSticky: true,
         render: (complaint) => (
@@ -393,9 +393,9 @@ const ComplaintsPage = () => {
         key: 'actions',
         header: 'Actions',
         width: 100,
-        align: 'center',
+        align: 'left',
         sticky: 'right',
-        defaultSticky: true,
+        // defaultSticky: true,
         render: (complaint) => (
           <Button
             variant="outline-primary"
@@ -893,10 +893,10 @@ const ComplaintsPage = () => {
                       <small className="text-muted d-block">Updated</small>
                       <strong className="small">{formatDateTime(selectedComplaint.updated_at)}</strong>
                     </Col>
-                    <Col xs={12}>
+                    {/* <Col xs={12}>
                       <small className="text-muted d-block">Call Log ID</small>
                       <code className="small">{selectedComplaint.call_log_id}</code>
-                    </Col>
+                    </Col> */}
                   </Row>
                 </Card.Body>
               </Card>
@@ -1049,7 +1049,7 @@ const ComplaintsPage = () => {
                       </Badge>
                     </Col>
                   </Row>
-                  <Row className="g-3">
+                  {/* <Row className="g-3">
                     <Col xs={12}>
                       <small className="text-muted d-block">Conversation ID</small>
                       <code className="small">{selectedCallLog.conversation_id}</code>
@@ -1058,7 +1058,7 @@ const ComplaintsPage = () => {
                       <small className="text-muted d-block">Agent ID</small>
                       <code className="small">{selectedCallLog.agent_id}</code>
                     </Col>
-                  </Row>
+                  </Row> */}
                 </Card.Body>
               </Card>
 

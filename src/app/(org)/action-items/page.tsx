@@ -610,11 +610,11 @@ const ActionItemsPage = () => {
       {
         key: 'actions',
         header: 'Actions',
-        width: 200,
+        width: 100,
         align: 'center',
         sticky: 'right',
         render: (item) => (
-          <div className="d-flex gap-1 justify-content-center">
+          <div className="d-flex gap-1 justify-content-left">
             <Button
               size="sm"
               variant="outline-primary"
@@ -722,15 +722,24 @@ const ActionItemsPage = () => {
         <Modal.Body>
           {selectedItem && (
             <div>
+              <div className="mb-3">
+                <label className="text-muted small">Title</label>
+                <h5>{selectedItem.title}</h5>
+              </div>
+              <div className="mb-3">
+                <label className="text-muted small">Description</label>
+                <p className="mb-0">{selectedItem.description || 'No description provided'}</p>
+              </div>
+              <hr />
               <Row className="g-3 mb-3">
-                <Col md={6}>
+                {/* <Col md={6}>
                   <label className="text-muted small">Item ID</label>
                   <div className="fw-medium font-monospace small">{selectedItem.id}</div>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Call ID</label>
                   <div className="fw-medium font-monospace small">{selectedItem.call_id || '—'}</div>
-                </Col>
+                </Col> */}
                 <Col md={6}>
                   <label className="text-muted small">Type</label>
                   <div>
@@ -896,16 +905,7 @@ const ActionItemsPage = () => {
                   )}
                 </Col>
               </Row>
-              <hr />
-              <div className="mb-3">
-                <label className="text-muted small">Title</label>
-                <h5>{selectedItem.title}</h5>
-              </div>
-              <div className="mb-3">
-                <label className="text-muted small">Description</label>
-                <p className="mb-0">{selectedItem.description || 'No description provided'}</p>
-              </div>
-              <hr />
+              <hr />              
               <Row className="g-3">
                 <Col md={6}>
                   <label className="text-muted small">Created At</label>

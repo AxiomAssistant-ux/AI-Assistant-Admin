@@ -5,8 +5,8 @@ import React, { useState } from 'react'
 import { Modal, Button, Form, Row, Col, Alert, Card, Spinner, Badge } from 'react-bootstrap'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { toast } from 'react-toastify'
-import { agentConfigApi, type QuickSetupAnswers } from '@/api/org/agentConfigs'
-import type { AgentConfiguration } from '@/api/org/agentConfigs'
+import { agentConfigApi, type QuickSetupAnswers } from '@/api/org/agents'
+import type { AgentConfiguration } from '@/api/org/agents'
 
 interface QuickSetupWizardProps {
   show: boolean

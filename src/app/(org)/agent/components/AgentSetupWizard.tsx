@@ -1002,5 +1002,3 @@ export const AgentSetupWizard: React.FC<AgentSetupWizardProps> = ({
     </Modal>
   )
 }
-
-// Step Components (to be continued in next artifact...)

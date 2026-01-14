@@ -527,7 +527,7 @@ const UserManagementPage = () => {
         header: 'Status',
         width: 120,
         render: (user) => (
-          <Badge bg={getStatusVariant(user.status)} className="text-capitalize">
+          <Badge  bg={getStatusVariant(user.status)} className="text-capitalize">
             {user.status}
           </Badge>
         )
@@ -553,7 +553,7 @@ const UserManagementPage = () => {
         align: 'center',
         sticky: 'right',
         render: (user) => (
-          <div className="d-flex gap-1 justify-content-center">
+          <div className="d-flex gap-1 justify-content-left">
             <Button
               size="sm"
               variant="outline-primary"

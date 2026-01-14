@@ -315,7 +315,7 @@ const LocationsPage = () => {
         key: 'rowNumber',
         header: '#',
         width: 60,
-        align: 'center',
+        align: 'left',
         render: (_, { rowIndex }) => (
           <span className="text-muted">{startIndex + rowIndex + 1}</span>
         )
@@ -364,7 +364,7 @@ const LocationsPage = () => {
         sticky: 'right',
         defaultSticky: true,
         render: (location) => (
-          <div className="d-flex gap-2 justify-content-center">
+          <div className="d-flex gap-2 justify-content-left">
             <Button
               variant="outline-primary"
               size="sm"
