@@ -6,6 +6,7 @@ import Image from 'next/image'
 import Link from 'next/link'
 import DarkLogo from '@/assets/images/logo-dark.png'
 import LightLogo from '@/assets/images/logo-light.png'
+import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { Row, Col } from 'react-bootstrap'
 
 interface OnboardingLayoutProps {
@@ -14,10 +15,9 @@ interface OnboardingLayoutProps {
 
 const steps = [
   { key: 'org', label: 'Organization', number: 1 },
-  { key: 'team', label: 'Team Setup', number: 2 },
-  { key: 'usecase', label: 'Use Case', number: 3 },
-  { key: 'plan', label: 'Pricing', number: 4 },
-  { key: 'payment', label: 'Payment', number: 5 },
+  { key: 'usecase', label: 'Use Case', number: 2 },
+  { key: 'plan', label: 'Pricing', number: 3 },
+  { key: 'payment', label: 'Payment', number: 4 },
 ]
 
 const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
@@ -26,9 +26,9 @@ const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
   const currentStep = searchParams.get('step') || 'org'
 
   useEffect(() => {
-    document.body.classList.add('authentication-bg')
+    document.body.classList.add('authentication-bg', 'onboarding-screen')
     return () => {
-      document.body.classList.remove('authentication-bg')
+      document.body.classList.remove('authentication-bg', 'onboarding-screen')
     }
   }, [])
 
@@ -45,93 +45,112 @@ const OnboardingLayout = ({ children }: OnboardingLayoutProps) => {
   const totalSteps = steps.length
 
   return (
-    <div className="account-pages py-5">
-      <div className="container">
-        <Row className="justify-content-center">
-          <Col md={8} lg={7} xl={6}>
-            {/* Logo */}
-            <div className="text-center mb-4">
-              <div className="mx-auto auth-logo">
-                <Link href="/" className="logo-dark">
-                  <Image src={LightLogo} height={32} alt="logo dark" />
-                </Link>
-                <Link href="/" className="logo-light">
-                  <Image src={LightLogo} height={32} alt="logo light" />
-                </Link>
-              </div>
-            </div>
+    <div className="onboarding-container">
+      {/* Animated Background */}
+      <div className="animated-background">
+        <a
+          href="https://assistant.axiomsolinc.com/"
+          className="back-to-site-left"
+        >
+          <IconifyIcon icon="solar:arrow-left-linear" width={18} height={18} />
+          <span>Back to site</span>
+        </a>
 
-            {/* Progress Indicator */}
-            <div className="mb-4">
-              <div className="d-flex justify-content-between align-items-center mb-3">
-                <span className="text-white text-opacity-75 small">
-                  Step {currentStepNumber} of {totalSteps}
-                </span>
-                <span className="text-white text-opacity-75 small">
-                  {steps[currentStepIndex]?.label}
-                </span>
-              </div>
-              
-              {/* Progress Bar */}
-              <div className="progress" style={{ height: '4px', backgroundColor: 'rgba(255,255,255,0.1)' }}>
-                <div
-                  className="progress-bar"
-                  role="progressbar"
-                  style={{ 
-                    width: `${(currentStepNumber / totalSteps) * 100}%`,
-                    transition: 'width 0.3s ease'
-                  }}
-                  aria-valuenow={currentStepNumber}
-                  aria-valuemin={1}
-                  aria-valuemax={totalSteps}
-                />
-              </div>
+        {/* Floating orbs */}
+        <div className="orb orb-1"></div>
+        <div className="orb orb-2"></div>
+        <div className="orb orb-3"></div>
 
-              {/* Step Dots */}
-              <div className="d-flex justify-content-between mt-2">
-                {steps.map((step, idx) => (
+        {/* Floating shapes */}
+        <div className="floating-shape shape-1"></div>
+        <div className="floating-shape shape-2"></div>
+        <div className="floating-shape shape-3"></div>
+        <div className="floating-shape shape-4"></div>
+      </div>
+
+      {/* Content Overlay */}
+      <div className="onboarding-content">
+        <div className="container">
+          <Row className="justify-content-center">
+            <Col md={10} lg={8} xl={7}>
+              {/* Logo */}
+              {/* <div className="text-center mb-4">
+                <div className="mx-auto auth-logo">
+                  <Link href="/" className="logo-dark">
+                    <Image src={DarkLogo} height={40} alt="logo dark" />
+                  </Link>
+                  <Link href="/" className="logo-light">
+                    <Image src={LightLogo} height={40} alt="logo light" />
+                  </Link>
+                </div>
+              </div> */}
+
+              {/* Progress Indicator */}
+              <div className="mb-4">
+                <div className="d-flex justify-content-between align-items-center mb-3">
+                  <span className="text-white text-opacity-90 fw-medium">
+                    Step {currentStepNumber} of {totalSteps}
+                  </span>
+                  <span className="text-white text-opacity-90 fw-medium">
+                    {steps[currentStepIndex]?.label}
+                  </span>
+                </div>
+                
+                {/* Progress Bar */}
+                <div className="progress modern-progress" style={{ height: '6px' }}>
                   <div
-                    key={step.key}
-                    className="d-flex flex-column align-items-center"
-                    style={{ flex: 1 }}
-                  >
-                    <div
-                      className={`rounded-circle d-flex align-items-center justify-content-center ${
-                        idx < currentStepIndex
-                          ? 'bg-success'
-                          : idx === currentStepIndex
-                          ? 'bg-primary'
-                          : 'bg-white bg-opacity-10'
-                      }`}
-                      style={{
-                        width: '32px',
-                        height: '32px',
-                        fontSize: '12px',
-                        fontWeight: '600',
-                        color: idx <= currentStepIndex ? 'white' : 'rgba(255,255,255,0.5)',
-                        transition: 'all 0.3s ease'
-                      }}
-                    >
-                      {idx < currentStepIndex ? '✓' : step.number}
-                    </div>
-                    <span 
-                      className="text-white small mt-1 d-none d-md-block" 
-                      style={{ 
-                        fontSize: '10px',
-                        opacity: idx <= currentStepIndex ? 1 : 0.5
-                      }}
-                    >
-                      {step.label}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            </div>
+                    className="progress-bar"
+                    role="progressbar"
+                    style={{ 
+                      width: `${(currentStepNumber / totalSteps) * 100}%`,
+                      transition: 'width 0.3s ease'
+                    }}
+                    aria-valuenow={currentStepNumber}
+                    aria-valuemin={1}
+                    aria-valuemax={totalSteps}
+                  />
+                </div>
 
-            {/* Content */}
-            {children}
-          </Col>
-        </Row>
+                {/* Step Dots */}
+                <div className="d-flex justify-content-between mt-3">
+                  {steps.map((step, idx) => (
+                    <div
+                      key={step.key}
+                      className="d-flex flex-column align-items-center"
+                      style={{ flex: 1 }}
+                    >
+                      <div
+                        className={`step-dot ${
+                          idx < currentStepIndex
+                            ? 'completed'
+                            : idx === currentStepIndex
+                            ? 'active'
+                            : 'inactive'
+                        }`}
+                      >
+                        {idx < currentStepIndex ? (
+                          <IconifyIcon icon="solar:check-circle-bold" width={20} height={20} />
+                        ) : (
+                          step.number
+                        )}
+                      </div>
+                      <span 
+                        className={`step-label ${idx <= currentStepIndex ? 'active' : ''}`}
+                      >
+                        {step.label}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Content Card */}
+              <div className="">
+                {children}
+              </div>
+            </Col>
+          </Row>
+        </div>
       </div>
     </div>
   )

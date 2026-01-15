@@ -305,7 +305,7 @@ const ContactSupportPage = () => {
         key: 'actions',
         header: 'Actions',
         width: 100,
-        align: 'center',
+        align: 'left',
         sticky: 'right',
         render: (ticket) => (
           <Button
@@ -363,9 +363,9 @@ const ContactSupportPage = () => {
               <IconifyIcon icon="solar:phone-calling-linear" width={48} height={48} className="text-success mb-3" />
               <h5>Phone Support</h5>
               <p className="text-muted small">Call us during business hours for immediate assistance.</p>
-              <div className="fw-semibold mb-1">+1 (555) 123-4567</div>
+              <div className="fw-semibold mb-1">+1 (310) 707-3291</div>
               <div className="text-muted small mb-2">Mon-Fri 9AM-6PM EST</div>
-              <a href="tel:+15551234567" className="btn btn-outline-success btn-sm">
+              <a href="tel:+13107073291" className="btn btn-outline-success btn-sm">
                 <IconifyIcon icon="solar:phone-calling-linear" width={16} height={16} className="me-1" />
                 Call Now
               </a>
@@ -386,7 +386,16 @@ const ContactSupportPage = () => {
                 </Badge>
               </div>
               <div className="text-muted small mb-2">Mon-Fri 9AM-6PM EST</div>
-              <Button variant="outline-info" size="sm" disabled>
+              <Button
+                variant="outline-info"
+                size="sm"
+                onClick={() =>
+                  window.open(
+                    "https://wa.me/13107073291?text=" + encodeURIComponent("Hi! I need support."),
+                    "_blank"
+                  )
+                }
+              >
                 <IconifyIcon icon="solar:chat-round-linear" width={16} height={16} className="me-1" />
                 Start Chat
               </Button>
@@ -548,10 +557,10 @@ const ContactSupportPage = () => {
           {selectedTicket && (
             <div>
               <Row className="g-3 mb-3">
-                <Col md={6}>
+                {/* <Col md={6}>
                   <label className="text-muted small">Ticket ID</label>
                   <div className="fw-medium font-monospace small">{selectedTicket.id}</div>
-                </Col>
+                </Col> */}
                 <Col md={6}>
                   <label className="text-muted small">Status</label>
                   <div>
@@ -560,7 +569,7 @@ const ContactSupportPage = () => {
                     </Badge>
                   </div>
                 </Col>
-                <Col md={4}>
+                <Col md={6}>
                   <label className="text-muted small">Type</label>
                   <div>
                     <Badge bg={getTypeVariant(selectedTicket.type)} className="text-capitalize">
@@ -568,7 +577,7 @@ const ContactSupportPage = () => {
                     </Badge>
                   </div>
                 </Col>
-                <Col md={4}>
+                <Col md={6}>
                   <label className="text-muted small">Priority</label>
                   <div>
                     <Badge bg={getPriorityVariant(selectedTicket.priority)} className="text-uppercase">
@@ -576,7 +585,7 @@ const ContactSupportPage = () => {
                     </Badge>
                   </div>
                 </Col>
-                <Col md={4}>
+                <Col md={6}>
                   <label className="text-muted small">Created</label>
                   <div className="small">{formatDate(selectedTicket.created_at)}</div>
                 </Col>

@@ -1,5 +1,6 @@
 'use client'
 
+import type { Metadata } from 'next'
 import React, { useEffect, useState, useMemo, useCallback } from 'react'
 import { Row, Col, Card, CardBody, CardHeader, CardTitle, Spinner, Alert, Badge, Button, ButtonGroup } from 'react-bootstrap'
 import Link from 'next/link'
@@ -19,6 +20,7 @@ import dynamic from 'next/dynamic'
 const ReactApexChart = dynamic(() => import('react-apexcharts'), {
   ssr: false,
 })
+
 
 
 type PeriodOption = {

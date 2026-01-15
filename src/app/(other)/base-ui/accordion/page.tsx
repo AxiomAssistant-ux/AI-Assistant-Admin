@@ -4,7 +4,7 @@ import Link from 'next/link'
 import React from 'react'
 import { Accordion, AccordionBody, AccordionHeader, AccordionItem, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 
-export const metadata: Metadata = { title: 'Accodion | Taplox - Responsive Admin Dashboard Template' }
+export const metadata: Metadata = { title: 'Accodion | AI Assistant Dashboard' }
 
 const accordionData = ['first', 'second', 'third']
 

@@ -15,7 +15,7 @@ import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import { Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 import { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Avatar | Taplox - Responsive Admin Dashboard Template' }
+export const metadata: Metadata = { title: 'Avatar | AI Assistant Dashboard' }
 
 const BasicAvatar = () => {
   return (

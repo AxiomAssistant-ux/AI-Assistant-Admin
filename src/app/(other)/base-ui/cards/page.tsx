@@ -9,7 +9,7 @@ import small5 from '@/assets/images/small/img-5.jpg'
 import { Card, CardBody, CardTitle, Col, Row } from 'react-bootstrap'
 import { Metadata } from 'next'
 
-export const metadata: Metadata = { title: 'Cards | Taplox - Responsive Admin Dashboard Template' }
+export const metadata: Metadata = { title: 'Cards | AI Assistant Dashboard' }
 
 const CardTitle1 = () => {
   return (

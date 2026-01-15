@@ -317,8 +317,8 @@ const PaymentStep = () => {
   }
 
   return (
-    <Card className="border-0 shadow-lg">
-      <CardBody className="p-5">
+    <Card className="onboarding-card">
+      <CardBody className="">
         <div className="text-center mb-4">
           <div className="mb-3">
             <IconifyIcon 

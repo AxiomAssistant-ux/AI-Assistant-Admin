@@ -10,6 +10,7 @@ import { VerticalDebug } from '@/components/VerticalDebug'
 const TopNavigationBar = dynamic(() => import('@/components/layout/TopNavigationBar/page'))
 const VerticalNavigationBar = dynamic(() => import('@/components/layout/VerticalNavigationBar/page'))
 
+
 const AdminLayout = ({ children }: ChildrenType) => {
   return (
     <AuthGuard actor="org" signInPath="/auth/sign-in">

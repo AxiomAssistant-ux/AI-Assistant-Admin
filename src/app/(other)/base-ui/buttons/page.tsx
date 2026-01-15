@@ -4,7 +4,7 @@ import Link from 'next/link'
 import React from 'react'
 import { Card, CardBody, CardHeader, CardTitle, Col, Dropdown, DropdownItem, DropdownMenu, DropdownToggle, Row } from 'react-bootstrap'
 
-export const metadata: Metadata = { title: 'Buttons | Taplox - Responsive Admin Dashboard Template' }
+export const metadata: Metadata = { title: 'Buttons | AI Assistant Dashboard' }
 
 const DefaultButtons = () => {
   return (

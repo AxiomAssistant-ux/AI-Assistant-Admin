@@ -4,7 +4,7 @@ import Link from 'next/link'
 import React from 'react'
 import { Alert, Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 
-export const metadata: Metadata = { title: 'Alerts | Taplox - Responsive Admin Dashboard Template' }
+export const metadata: Metadata = { title: 'Alerts | AI Assistant Dashboard' }
 
 const BasicAlerts = () => {
   return (

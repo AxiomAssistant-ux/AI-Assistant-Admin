@@ -4,7 +4,7 @@ import Link from 'next/link'
 import React from 'react'
 import { Card, CardBody, CardHeader, CardTitle, Col, Row } from 'react-bootstrap'
 
-export const metadata: Metadata = { title: 'Badge | Taplox - Responsive Admin Dashboard Template' }
+export const metadata: Metadata = { title: 'Badge | AI Assistant Dashboard' }
 
 const HeadingBadge = () => {
   return (

@@ -66,7 +66,7 @@ const UseCaseStep = () => {
 
   if (verticalsLoading) {
     return (
-      <Card className="border-0 shadow-lg">
+      <Card className="onboarding-card">
         <CardBody className="p-5">
           <div className="text-center py-5">
             <div className="spinner-border text-primary mb-3" role="status">
@@ -80,8 +80,8 @@ const UseCaseStep = () => {
   }
 
   return (
-    <Card className="border-0 shadow-lg">
-      <CardBody className="p-5">
+    <Card className="onboarding-card">
+      <CardBody className="">
         <div className="text-center mb-4">
           <div className="mb-3">
             <IconifyIcon 
