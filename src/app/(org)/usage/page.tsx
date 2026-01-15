@@ -209,7 +209,7 @@ const UsageAndBillingPage = () => {
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         {usageData.alerts.map((alert, index) => (
           <Col xs={12} key={index} className="mb-3">
             <div className={`alert alert-${getAlertVariant(alert.type)} d-flex align-items-center mb-0`} role="alert">

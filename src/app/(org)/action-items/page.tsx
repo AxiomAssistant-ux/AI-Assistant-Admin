@@ -49,6 +49,8 @@ const ActionItemsPage = () => {
   const [loadingCallLog, setLoadingCallLog] = useState(false)
   const [submittingConfirm, setSubmittingConfirm] = useState(false)
 
+  const [pendingUrgentCount, setPendingUrgentCount] = useState(0)
+
   const [appointmentForm, setAppointmentForm] = useState({
     customer_name: '',
     customer_phone: '',
@@ -66,6 +68,26 @@ const ActionItemsPage = () => {
     delivery_time: '',
     special_instructions: ''
   })
+
+  const calculatePendingUrgentCount = (items: ActionItem[]) => {
+    return items.filter(
+      item => item.status === 'pending' && (item.urgency === 'high' || item.urgency === 'critical')
+    ).length
+  }
+
+  const updatePendingUrgentCount = useCallback(() => {
+    const count = calculatePendingUrgentCount(actionItems)
+    setPendingUrgentCount(count)
+
+    // Notify sidebar
+    window.dispatchEvent(new CustomEvent('pendingUrgentActionItemsUpdated', {
+      detail: { count }
+    }))
+  }, [actionItems])
+
+  useEffect(() => {
+    updatePendingUrgentCount()
+  }, [updatePendingUrgentCount])
 
   useEffect(() => {
     const timer = setTimeout(() => setDebouncedSearch(searchQuery.trim().toLowerCase()), 350)
@@ -155,7 +177,7 @@ const ActionItemsPage = () => {
     }
 
     setConfirmAppointmentModalOpen(true)
-  },[])
+  }, [])
 
   const handleConfirmOrder = useCallback(async (item: ActionItem) => {
     setConfirmingItem(item)
@@ -189,7 +211,7 @@ const ActionItemsPage = () => {
     }
 
     setConfirmOrderModalOpen(true)
-  },[])
+  }, [])
 
   const submitAppointment = async () => {
     if (!confirmingItem) return
@@ -281,6 +303,105 @@ const ActionItemsPage = () => {
     }
   }
 
+  // const submitAppointment = async () => {
+  //   if (!confirmingItem) return
+
+  //   if (!appointmentForm.customer_name || !appointmentForm.customer_phone || !appointmentForm.scheduled_at) {
+  //     toast.error('Please fill in all required fields')
+  //     return
+  //   }
+
+  //   setSubmittingConfirm(true)
+  //   try {
+  //     const appointmentData: CreateAppointmentRequest = {
+  //       call_id: confirmingItem.call_id || null,
+  //       customer_name: appointmentForm.customer_name,
+  //       customer_phone: appointmentForm.customer_phone,
+  //       customer_email: appointmentForm.customer_email || null,
+  //       scheduled_at: new Date(appointmentForm.scheduled_at).toISOString()
+  //     }
+
+  //     await appointmentsApi.create(appointmentData)
+
+  //     // Mark action item as completed
+  //     await actionItemsApi.update(confirmingItem.id, { status: 'completed' })
+
+  //     toast.success('Appointment created successfully!')
+  //     setConfirmAppointmentModalOpen(false)
+  //     setConfirmingItem(null)
+  //     setAppointmentForm({
+  //       customer_name: '',
+  //       customer_phone: '',
+  //       customer_email: '',
+  //       scheduled_at: ''
+  //     })
+
+  //     // Notify sidebar of change
+  //     window.dispatchEvent(new CustomEvent('actionItemChanged'))
+
+  //     fetchActionItems()
+  //   } catch (err: any) {
+  //     toast.error(err.response?.data?.detail || 'Failed to create appointment')
+  //   } finally {
+  //     setSubmittingConfirm(false)
+  //   }
+  // }
+
+  // // Update submitOrder function similarly
+  // const submitOrder = async () => {
+  //   if (!confirmingItem) return
+
+  //   if (!orderForm.customer_name || !orderForm.customer_phone || !orderForm.order_details) {
+  //     toast.error('Please fill in all required fields')
+  //     return
+  //   }
+
+  //   setSubmittingConfirm(true)
+  //   try {
+  //     const orderData: CreateOrderRequest = {
+  //       call_id: confirmingItem.call_id || null,
+  //       customer_name: orderForm.customer_name,
+  //       customer_phone: orderForm.customer_phone,
+  //       customer_email: orderForm.customer_email || null,
+  //       order_details: orderForm.order_details,
+  //       total_amount: orderForm.total_amount ? parseFloat(orderForm.total_amount) : null,
+  //       currency: orderForm.currency,
+  //       urgency: confirmingItem.urgency === 'high' || confirmingItem.urgency === 'critical',
+  //       assigned_role: confirmingItem.assigned_role || null,
+  //       delivery_time: orderForm.delivery_time ? new Date(orderForm.delivery_time).toISOString() : null,
+  //       special_instructions: orderForm.special_instructions || null
+  //     }
+
+  //     await ordersApi.create(orderData)
+
+  //     // Mark action item as completed
+  //     await actionItemsApi.update(confirmingItem.id, { status: 'completed' })
+
+  //     toast.success('Order created successfully!')
+  //     setConfirmOrderModalOpen(false)
+  //     setConfirmingItem(null)
+  //     setOrderForm({
+  //       customer_name: '',
+  //       customer_phone: '',
+  //       customer_email: '',
+  //       order_details: '',
+  //       total_amount: '',
+  //       currency: 'USD',
+  //       delivery_time: '',
+  //       special_instructions: ''
+  //     })
+
+  //     // Notify sidebar of change
+  //     window.dispatchEvent(new CustomEvent('actionItemChanged'))
+
+  //     fetchActionItems()
+  //   } catch (err: any) {
+  //     toast.error(err.response?.data?.detail || 'Failed to create order')
+  //   } finally {
+  //     setSubmittingConfirm(false)
+  //   }
+  // }
+
   const handleStatusToggle = useCallback(async (itemId: string, currentStatus: ActionItem['status']) => {
     const statusFlow: Record<ActionItem['status'], ActionItem['status']> = {
       pending: 'in_progress',
@@ -301,6 +422,9 @@ const ActionItemsPage = () => {
       if (selectedItem && selectedItem.id === itemId) {
         setSelectedItem({ ...selectedItem, status: newStatus, updated_at: new Date().toISOString() })
       }
+
+      // Notify sidebar of change
+      window.dispatchEvent(new CustomEvent('actionItemChanged'))
 
       toast.success('Status updated successfully')
     } catch (err) {
@@ -325,13 +449,16 @@ const ActionItemsPage = () => {
         setSelectedItem({ ...selectedItem, urgency: newUrgency, updated_at: new Date().toISOString() })
       }
 
+      // Notify sidebar of change
+      window.dispatchEvent(new CustomEvent('actionItemChanged'))
+
       toast.success('Urgency updated successfully')
     } catch (err) {
       toast.error('Failed to update urgency')
     } finally {
       setUpdatingField(null)
     }
-  },[selectedItem])
+  }, [selectedItem])
 
   const handleDueDateSave = async (itemId: string) => {
     if (!dueDateValue) {
@@ -671,7 +798,7 @@ const ActionItemsPage = () => {
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         <Col xs={12}>
           <DataTable
             id="action-items-table"
@@ -905,7 +1032,7 @@ const ActionItemsPage = () => {
                   )}
                 </Col>
               </Row>
-              <hr />              
+              <hr />
               <Row className="g-3">
                 <Col md={6}>
                   <label className="text-muted small">Created At</label>

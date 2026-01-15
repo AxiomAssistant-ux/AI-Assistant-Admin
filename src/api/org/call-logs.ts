@@ -136,5 +136,21 @@ export const callLogsApi = {
       headers: getAuthHeaders()
     })
     return response.data
+  },
+
+  async markAsRead(id: string): Promise<{ message: string; was_updated: boolean }> {
+    const response = await axios.patch(
+      `${API_BASE}/org/call-logs/${id}/mark-read`,
+      {},
+      { headers: getAuthHeaders() }
+    )
+    return response.data
+  },
+
+  async getUnreadCount(): Promise<{ unread_count: number }> {
+    const response = await axios.get(`${API_BASE}/org/call-logs/stats/unread-count`, {
+      headers: getAuthHeaders()
+    })
+    return response.data
   }
 }

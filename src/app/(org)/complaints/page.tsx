@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { Row, Col, Button, Badge, Modal, Card, Form, Spinner } from 'react-bootstrap'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
@@ -14,6 +14,75 @@ import { complaintsApi, type Complaint, type ComplaintsListParams, type Complain
 import { callLogsApi, type CallLog } from '@/api/org/call-logs'
 import { locationsApi, type Location } from '@/api/org/locations'
 import { useFeatureGuard } from '@/hooks/useFeatureGuard'
+
+const ProgressButton = ({
+  progress,
+  onClick,
+  title,
+  icon,
+  variant = "outline-danger",
+}: {
+  progress: number
+  onClick: (e?: any) => void
+  title: string
+  icon: React.ReactNode
+  variant?: string
+}) => {
+  const size = 34
+  const stroke = 3
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference * (1 - progress)
+
+  return (
+    <div style={{ width: size, height: size, position: "relative" }}>
+      <svg width={size} height={size} style={{ position: "absolute", top: 0, left: 0 }}>
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#e5e7eb"
+          strokeWidth={stroke}
+          fill="transparent"
+        />
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#ff0000ff"
+          strokeWidth={stroke}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{
+            transition: "stroke-dashoffset 0.1s linear",
+            transform: "rotate(-90deg)",
+            transformOrigin: "50% 50%",
+          }}
+        />
+      </svg>
+
+      <Button
+        variant={variant as any}
+        size="sm"
+        onClick={onClick}
+        title={title}
+        style={{
+          width: size,
+          height: size,
+          padding: 0,
+          position: "relative",
+          zIndex: 2,
+          borderRadius: 999,
+        }}
+      >
+        {icon}
+      </Button>
+    </div>
+  )
+}
+
 
 const ComplaintsPage = () => {
   useFeatureGuard()
@@ -42,12 +111,102 @@ const ComplaintsPage = () => {
 
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
-  
+
   // Call log modal state
   const [selectedCallLog, setSelectedCallLog] = useState<CallLog | null>(null)
   const [showCallLogModal, setShowCallLogModal] = useState(false)
   const [loadingCallLog, setLoadingCallLog] = useState(false)
   const [audioError, setAudioError] = useState<string | null>(null)
+
+  const shownNotifications = useRef<Set<string>>(new Set())
+
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [playProgress, setPlayProgress] = useState<Record<string, number>>({})
+  const audioRef = useRef<HTMLAudioElement | null>(null)
+  const rafRef = useRef<number | null>(null)
+  const playingIdRef = useRef<string | null>(null)
+
+
+  const stopAudio = useCallback((silent = true) => {
+    const audio = audioRef.current
+    const currentId = playingIdRef.current
+
+    // cancel animation
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+
+    // stop audio safely
+    if (audio) {
+      audio.pause()
+      audio.currentTime = 0
+      audioRef.current = null
+    }
+
+    playingIdRef.current = null
+    setPlayingId(null)
+
+    if (currentId) {
+      setPlayProgress((prev) => ({ ...prev, [currentId]: 0 }))
+    }
+  }, [])
+
+
+  const playAudio = useCallback(async (id: string, recordingLink: string) => {
+    if (!recordingLink) return
+
+    // if same recording is already playing -> stop
+    if (playingIdRef.current === id) {
+      stopAudio()
+      return
+    }
+
+    // stop old audio first
+    stopAudio(true)
+
+    const audio = new Audio(recordingLink)
+    audioRef.current = audio
+    playingIdRef.current = id
+    setPlayingId(id)
+
+    const updateProgress = () => {
+      const a = audioRef.current
+      if (!a) return
+
+      const duration = a.duration || 0
+      const current = a.currentTime || 0
+      const progress = duration > 0 ? current / duration : 0
+
+      setPlayProgress((prev) => ({ ...prev, [id]: progress }))
+      rafRef.current = requestAnimationFrame(updateProgress)
+    }
+
+    audio.onended = () => stopAudio()
+    audio.onerror = () => {
+      toast.error("Failed to play audio")
+      stopAudio()
+    }
+
+    try {
+      await audio.play()
+      rafRef.current = requestAnimationFrame(updateProgress)
+    } catch (err: any) {
+      // ✅ Ignore AbortError (happens when user clicks fast)
+      if (err?.name === "AbortError") return
+
+      toast.error("Failed to play audio")
+      console.error("Audio playback error:", err)
+      stopAudio()
+    }
+  }, [stopAudio])
+
+
+  useEffect(() => {
+    return () => stopAudio()
+  }, [stopAudio])
+
+
 
   // Debounce search
   useEffect(() => {
@@ -159,6 +318,24 @@ const ComplaintsPage = () => {
     }
   }, [currentPage, totalPages])
 
+  const handlePlayFromComplaint = useCallback(async (complaint: Complaint) => {
+    if (!complaint.call_log_id) return
+
+    try {
+      const callLog = await callLogsApi.getById(complaint.call_log_id)
+
+      if (!callLog.recording_link) {
+        toast.info('Recording not available')
+        return
+      }
+
+      playAudio(complaint.id, callLog.recording_link)
+    } catch (err) {
+      toast.error("Failed to load recording")
+    }
+  }, [playAudio])
+
+
   // Handle view details
   const handleViewDetails = useCallback((complaint: Complaint) => {
     setSelectedComplaint(complaint)
@@ -171,7 +348,7 @@ const ComplaintsPage = () => {
 
     setLoadingCallLog(true)
     setAudioError(null)
-    
+
     try {
       const callLog = await callLogsApi.getById(callLogId)
       setShowDetailModal(false)
@@ -191,7 +368,7 @@ const ComplaintsPage = () => {
     // Close modals
     setShowDetailModal(false)
     setShowCallLogModal(false)
-    
+
     // Navigate to call records page
     // The call records page will need to handle opening the modal via URL params or state
     router.push(`/call-records?openCallId=${callLogId}`)
@@ -392,23 +569,76 @@ const ComplaintsPage = () => {
       {
         key: 'actions',
         header: 'Actions',
-        width: 100,
+        width: 160,
         align: 'left',
         sticky: 'right',
-        // defaultSticky: true,
-        render: (complaint) => (
-          <Button
-            variant="outline-primary"
-            size="sm"
-            onClick={() => handleViewDetails(complaint)}
-            title="View Details"
-          >
-            <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
-          </Button>
-        )
+        render: (complaint) => {
+          const isPlaying = playingId === complaint.id
+          const progress = playProgress[complaint.id] || 0
+
+          return (
+            <div className="d-flex gap-2 align-items-center">
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => handleViewDetails(complaint)}
+                title="View Details"
+              >
+                <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
+              </Button>
+
+              {/* ✅ Play / Stop Recording */}
+              {complaint.call_log_id ? (
+                isPlaying ? (
+                  <ProgressButton
+                    progress={progress}
+                    onClick={(e) => {
+                      e?.stopPropagation?.()
+                      stopAudio()
+                    }}
+                    title="Stop Recording"
+                    variant="outline-danger"
+                    icon={<IconifyIcon icon="solar:stop-linear" width={16} height={16} />}
+                  />
+                ) : (
+                  <Button
+                    variant="outline-success"
+                    size="sm"
+                    onClick={(e) => {
+                      e?.stopPropagation?.()
+                      handlePlayFromComplaint(complaint)
+                    }}
+                    title="Play Recording"
+                  >
+                    <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+                  </Button>
+                )
+              ) : (
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled
+                  title="No Call Log Linked"
+                  style={{ opacity: 0.45 }}
+                >
+                  <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+                </Button>
+              )}
+            </div>
+          )
+        }
       }
+
     ],
-    [startIndex, handleViewDetails]
+    [
+      startIndex,
+      handleViewDetails,
+      playingId,
+      playProgress,
+      handlePlayFromComplaint,
+      stopAudio
+    ]
+
   )
 
   // Toolbar filters
@@ -498,7 +728,7 @@ const ComplaintsPage = () => {
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         <Col xs={12}>
           <DataTable
             id="complaints-table"
@@ -1148,14 +1378,14 @@ const ComplaintsPage = () => {
           )}
         </Modal.Body>
         <Modal.Footer>
-          <Button 
-            variant="secondary" 
+          <Button
+            variant="secondary"
             onClick={() => setShowCallLogModal(false)}
           >
             Close
           </Button>
-          <Button 
-            variant="primary" 
+          <Button
+            variant="primary"
             onClick={() => handleNavigateToCallLog(selectedCallLog!.id)}
           >
             <IconifyIcon icon="solar:arrow-right-linear" width={18} height={18} className="me-2" />

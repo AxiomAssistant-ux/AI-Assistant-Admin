@@ -48,7 +48,7 @@ const DEFAULT_FORM_STATE: UserFormState = {
 const UserManagementPage = () => {
   useFeatureGuard()
   const { token, user, isAuthenticated } = useAuth()
-  
+
   // Get vertical-filtered features
   const verticalKey = isOrgUser(user) ? user.organization?.vertical_key : undefined
   const AVAILABLE_FEATURES = useMemo(
@@ -83,7 +83,7 @@ const UserManagementPage = () => {
   }), [AVAILABLE_FEATURES])
 
   const isAdmin = Boolean(isAuthenticated && user && isOrgUser(user) && user.is_admin)
-  
+
   const [users, setUsers] = useState<OrgUser[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -130,7 +130,7 @@ const UserManagementPage = () => {
     if (!token || !isAuthenticated) return
     setLoading(true)
     setError(null)
-    
+
     try {
       const params: OrgUsersListParams = {
         skip: (currentPage - 1) * pageSize,
@@ -142,7 +142,7 @@ const UserManagementPage = () => {
       if (statusFilter !== 'all') params.status_filter = statusFilter
       if (roleFilter !== 'all') params.role_filter = roleFilter
       if (adminFilter !== 'all') params.admin_filter = adminFilter
-      
+
       const response = await orgUsersApi.list(params)
       setUsers(response.users)
       setTotal(response.total)
@@ -188,36 +188,36 @@ const UserManagementPage = () => {
 
   const validateForm = (): boolean => {
     const errors: Partial<Record<keyof UserFormState, string>> = {}
-    
+
     if (!formState.email.trim()) {
       errors.email = 'Email is required'
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formState.email)) {
       errors.email = 'Please enter a valid email address'
     }
-    
+
     if (!formState.name.trim()) {
       errors.name = 'Name is required'
     } else if (formState.name.trim().length > 100) {
       errors.name = 'Name must not exceed 100 characters'
     }
-    
+
     if (!formState.role_name.trim()) {
       errors.role_name = 'Role is required'
     }
-    
+
     if (!formState.is_admin && formState.features.length === 0) {
       errors.features = 'Please select at least one feature access'
     }
-    
+
     setFormErrors(errors)
     return Object.keys(errors).length === 0
   }
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!validateForm()) return
-    
+
     setSubmitting(true)
     try {
       const payload: CreateOrgUserRequest = {
@@ -225,11 +225,11 @@ const UserManagementPage = () => {
         name: formState.name.trim(),
         role_name: formState.role_name.trim(),
         is_admin: formState.is_admin,
-        features: formState.is_admin 
+        features: formState.is_admin
           ? AVAILABLE_FEATURES.map(f => f.value)
           : formState.features
       }
-      
+
       await orgUsersApi.create(payload)
       toast.success('User invited successfully')
       setCreateModalOpen(false)
@@ -245,20 +245,20 @@ const UserManagementPage = () => {
 
   const handleUpdate = async (e: React.FormEvent) => {
     e.preventDefault()
-    
+
     if (!selectedUser || !validateForm()) return
-    
+
     setSubmitting(true)
     try {
       const payload: UpdateOrgUserRequest = {
         name: formState.name.trim(),
         role_name: formState.role_name.trim(),
         is_admin: formState.is_admin,
-        features: formState.is_admin 
+        features: formState.is_admin
           ? AVAILABLE_FEATURES.map(f => f.value)
           : formState.features
       }
-      
+
       await orgUsersApi.update(selectedUser.id, payload)
       toast.success('User updated successfully')
       setEditModalOpen(false)
@@ -275,7 +275,7 @@ const UserManagementPage = () => {
 
   const handleDelete = async () => {
     if (!selectedUser) return
-    
+
     setSubmitting(true)
     try {
       await orgUsersApi.delete(selectedUser.id)
@@ -295,15 +295,15 @@ const UserManagementPage = () => {
     try {
       const newStatus = currentStatus === 'active' ? 'suspended' : 'active'
       await orgUsersApi.updateStatus(userId, newStatus as any)
-      
+
       setUsers(prev => prev.map(u =>
         u.id === userId ? { ...u, status: newStatus as any, updated_at: new Date().toISOString() } : u
       ))
-      
+
       if (selectedUser?.id === userId) {
         setSelectedUser({ ...selectedUser, status: newStatus as any, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success(`User ${newStatus === 'active' ? 'activated' : 'suspended'} successfully`)
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to update status')
@@ -316,15 +316,15 @@ const UserManagementPage = () => {
     setUpdatingUserId(userId)
     try {
       const response = await orgUsersApi.toggleAdmin(userId)
-      
+
       setUsers(prev => prev.map(u =>
         u.id === userId ? { ...u, is_admin: response.is_admin, updated_at: new Date().toISOString() } : u
       ))
-      
+
       if (selectedUser?.id === userId) {
         setSelectedUser({ ...selectedUser, is_admin: response.is_admin, updated_at: new Date().toISOString() })
       }
-      
+
       toast.success(response.message)
     } catch (err: any) {
       toast.error(err.response?.data?.detail || 'Failed to toggle admin status')
@@ -348,7 +348,7 @@ const UserManagementPage = () => {
   const handleRoleChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const { value } = e.target
     const roleConfig = PREDEFINED_ROLES[value as keyof typeof PREDEFINED_ROLES]
-    
+
     if (roleConfig) {
       setFormState(prev => ({
         ...prev,
@@ -362,7 +362,7 @@ const UserManagementPage = () => {
         role_name: value
       }))
     }
-    
+
     if (formErrors.role_name) {
       setFormErrors(prev => {
         const newErrors = { ...prev }
@@ -375,13 +375,13 @@ const UserManagementPage = () => {
   const handleFieldChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value, type } = e.target
     const checked = (e.target as HTMLInputElement).checked
-    
+
     setFormState(prev => ({
       ...prev,
       [name]: type === 'checkbox' ? checked : value,
       ...(name === 'is_admin' && checked ? { features: AVAILABLE_FEATURES.map(f => f.value) } : {})
     }))
-    
+
     if (formErrors[name as keyof UserFormState]) {
       setFormErrors(prev => {
         const newErrors = { ...prev }
@@ -398,7 +398,7 @@ const UserManagementPage = () => {
         ? prev.features.filter(f => f !== featureValue)
         : [...prev.features, featureValue]
     }))
-    
+
     if (formErrors.features) {
       setFormErrors(prev => {
         const newErrors = { ...prev }
@@ -527,7 +527,7 @@ const UserManagementPage = () => {
         header: 'Status',
         width: 120,
         render: (user) => (
-          <Badge  bg={getStatusVariant(user.status)} className="text-capitalize">
+          <Badge bg={getStatusVariant(user.status)} className="text-capitalize">
             {user.status}
           </Badge>
         )
@@ -626,7 +626,7 @@ const UserManagementPage = () => {
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         <Col xs={12}>
           <DataTable
             id="users-table"
@@ -910,58 +910,86 @@ const UserManagementPage = () => {
           {selectedUser && (
             <div>
               <Row className="g-3 mb-3">
-                <Col md={6}>
+                {/* <Col md={6}>
                   <label className="text-muted small">User ID</label>
                   <div className="fw-medium font-monospace small">{selectedUser.id}</div>
+                </Col> */}
+                <Col md={6}>
+                  <label className="text-muted small">Full Name</label>
+                  <h5 className="mb-0">{selectedUser.name}</h5>
                 </Col>
                 <Col md={6}>
                   <label className="text-muted small">Status</label>
                   <div className="d-flex align-items-center gap-2">
-                    <Badge bg={getStatusVariant(selectedUser.status)} className="text-capitalize">
-                      {selectedUser.status}
-                    </Badge>
-                    {selectedUser.status !== 'invited' && (
-                      <Button
-                        size="sm"
-                        variant="outline-secondary"
-                        onClick={() => handleStatusToggle(selectedUser.id, selectedUser.status)}
-                        disabled={updatingUserId === selectedUser.id}
-                        className="d-inline-flex align-items-center gap-1"
-                      >
+                    {/* Status badge becomes the toggle */}
+                    {selectedUser.status !== 'invited' ? (
+                      <Badge
+                        role="button"
+                        tabIndex={0}
+                        bg={getStatusVariant(selectedUser.status)}
+                        className="text-capitalize d-inline-flex align-items-center gap-2"
+                        style={{ cursor: updatingUserId === selectedUser.id ? 'not-allowed' : 'pointer', userSelect: 'none' }}
+                        onClick={() => {
+                          if (updatingUserId === selectedUser.id) return
+                          handleStatusToggle(selectedUser.id, selectedUser.status)
+                        }}
+                        onKeyDown={(e) => {
+                          if (updatingUserId === selectedUser.id) return
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleStatusToggle(selectedUser.id, selectedUser.status)
+                          }
+                        }}
+                        title="Click to toggle status"
+                      >                        
+                        {selectedUser.status}
                         {updatingUserId === selectedUser.id ? (
-                          <span className="spinner-border spinner-border-sm" role="status" />
+                          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
                         ) : (
-                          <>
-                            <IconifyIcon icon="solar:refresh-linear" width={14} height={14} />
-                            Toggle
-                          </>
+                          <IconifyIcon icon="solar:alt-arrow-right-linear" width={14} height={14} />
                         )}
-                      </Button>
+                      </Badge>
+                    ) : (
+                      // invited: keep as normal badge (no toggle)
+                      <Badge bg={getStatusVariant(selectedUser.status)} className="text-capitalize">
+                        {selectedUser.status}
+                      </Badge>
                     )}
+
+                    {/* invited: keep "Resend" as badge (optional) */}
                     {selectedUser.status === 'invited' && (
-                      <Button
-                        size="sm"
-                        variant="outline-warning"
-                        onClick={() => handleResendInvite(selectedUser.id)}
-                        disabled={updatingUserId === selectedUser.id}
-                        className="d-inline-flex align-items-center gap-1"
+                      <Badge
+                        role="button"
+                        tabIndex={0}
+                        bg="warning"
+                        text="dark"
+                        className="d-inline-flex align-items-center gap-2"
+                        style={{ cursor: updatingUserId === selectedUser.id ? 'not-allowed' : 'pointer', userSelect: 'none' }}
+                        onClick={() => {
+                          if (updatingUserId === selectedUser.id) return
+                          handleResendInvite(selectedUser.id)
+                        }}
+                        onKeyDown={(e) => {
+                          if (updatingUserId === selectedUser.id) return
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault()
+                            handleResendInvite(selectedUser.id)
+                          }
+                        }}
+                        title="Click to resend invite"
                       >
                         {updatingUserId === selectedUser.id ? (
-                          <span className="spinner-border spinner-border-sm" role="status" />
+                          <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
                         ) : (
-                          <>
-                            <IconifyIcon icon="solar:letter-linear" width={14} height={14} />
-                            Resend
-                          </>
+                          <IconifyIcon icon="solar:letter-linear" width={14} height={14} />
                         )}
-                      </Button>
+                        Resend Invite
+                      </Badge>
                     )}
                   </div>
+
                 </Col>
-                <Col md={12}>
-                  <label className="text-muted small">Full Name</label>
-                  <h5 className="mb-0">{selectedUser.name}</h5>
-                </Col>
+                
                 <Col md={12}>
                   <label className="text-muted small">Email Address</label>
                   <div className="fw-medium">{selectedUser.email}</div>
@@ -977,26 +1005,34 @@ const UserManagementPage = () => {
                 <Col md={6}>
                   <label className="text-muted small">Admin Status</label>
                   <div className="d-flex align-items-center gap-2">
-                    <Badge bg={selectedUser.is_admin ? 'primary' : 'secondary'}>
+                    <Badge
+                      role="button"
+                      tabIndex={0}
+                      bg={selectedUser.is_admin ? 'primary' : 'secondary'}
+                      className="d-inline-flex align-items-center gap-2"
+                      style={{ cursor: updatingUserId === selectedUser.id ? 'not-allowed' : 'pointer', userSelect: 'none' }}
+                      onClick={() => {
+                        if (updatingUserId === selectedUser.id) return
+                        handleAdminToggle(selectedUser.id, selectedUser.is_admin)
+                      }}
+                      onKeyDown={(e) => {
+                        if (updatingUserId === selectedUser.id) return
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          handleAdminToggle(selectedUser.id, selectedUser.is_admin)
+                        }
+                      }}
+                      title="Click to toggle admin status"
+                    >                      
                       {selectedUser.is_admin ? 'Admin' : 'Regular User'}
-                    </Badge>
-                    <Button
-                      size="sm"
-                      variant="outline-secondary"
-                      onClick={() => handleAdminToggle(selectedUser.id, selectedUser.is_admin)}
-                      disabled={updatingUserId === selectedUser.id}
-                      className="d-inline-flex align-items-center gap-1"
-                    >
                       {updatingUserId === selectedUser.id ? (
-                        <span className="spinner-border spinner-border-sm" role="status" />
+                        <span className="spinner-border spinner-border-sm" role="status" aria-hidden="true" />
                       ) : (
-                        <>
-                          <IconifyIcon icon="solar:refresh-linear" width={14} height={14} />
-                          Toggle
-                        </>
+                        <IconifyIcon icon="solar:refresh-linear" width={14} height={14} />
                       )}
-                    </Button>
+                    </Badge>
                   </div>
+
                 </Col>
               </Row>
               <hr />

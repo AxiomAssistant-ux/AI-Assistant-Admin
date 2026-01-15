@@ -17,6 +17,81 @@ import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates'
 import { useCallLogUpdates } from '@/hooks/useCallLogUpdates'
 import { useRealtime } from '@/context/RealtimeContext'
 
+const ProgressButton = ({
+  progress,
+  onClick,
+  title,
+  icon,
+  variant = "outline-danger",
+}: {
+  progress: number
+  onClick: () => void
+  title: string
+  icon: React.ReactNode
+  variant?: string
+}) => {
+  const size = 34
+  const stroke = 3
+  const radius = (size - stroke) / 2
+  const circumference = 2 * Math.PI * radius
+  const offset = circumference * (1 - progress)
+
+  return (
+    <div style={{ width: size, height: size, position: "relative" }}>
+      <svg
+        width={size}
+        height={size}
+        style={{ position: "absolute", top: 0, left: 0 }}
+      >
+        {/* background ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#e5e7eb"
+          strokeWidth={stroke}
+          fill="transparent"
+        />
+        {/* progress ring */}
+        <circle
+          cx={size / 2}
+          cy={size / 2}
+          r={radius}
+          stroke="#ff0000ff"
+          strokeWidth={stroke}
+          fill="transparent"
+          strokeDasharray={circumference}
+          strokeDashoffset={offset}
+          strokeLinecap="round"
+          style={{
+            transition: "stroke-dashoffset 0.1s linear",
+            transform: "rotate(-90deg)",
+            transformOrigin: "50% 50%",
+          }}
+        />
+      </svg>
+
+      <Button
+        variant={variant as any}
+        size="sm"
+        onClick={onClick}
+        title={title}
+        style={{
+          width: size,
+          height: size,
+          padding: 0,
+          position: "relative",
+          zIndex: 2,
+          borderRadius: 999,
+        }}
+      >
+        {icon}
+      </Button>
+    </div>
+  )
+}
+
+
 const CallRecordsPage = () => {
   useFeatureGuard()
 
@@ -44,6 +119,8 @@ const CallRecordsPage = () => {
   const [selectedLocationIds, setSelectedLocationIds] = useState<string[]>([])
   const [showFilters, setShowFilters] = useState(true)
 
+  const [unreadCount, setUnreadCount] = useState(0)
+
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
@@ -55,13 +132,74 @@ const CallRecordsPage = () => {
   const [hasAutoOpened, setHasAutoOpened] = useState(false)
   const [openedFromComplaints, setOpenedFromComplaints] = useState(false)
 
+  const [playingId, setPlayingId] = useState<string | null>(null)
+  const [playProgress, setPlayProgress] = useState<Record<string, number>>({})
   const audioRef = useRef<HTMLAudioElement | null>(null)
+  const rafRef = useRef<number | null>(null)
 
 
   // const { isConnected: realtimeConnected } = useRealtime()
   // useCallLogUpdates({
   //   onCallLogCreated: handleCallLogCreated
   // })
+
+  const stopAudio = useCallback(() => {
+    if (audioRef.current) {
+      audioRef.current.pause()
+      audioRef.current.currentTime = 0
+      audioRef.current = null
+    }
+
+    if (rafRef.current) {
+      cancelAnimationFrame(rafRef.current)
+      rafRef.current = null
+    }
+
+    setPlayingId(null)
+  }, [])
+
+  const playAudio = useCallback((call: CallLog) => {
+    if (!call.recording_link) return
+
+    // stop previous if something else is playing
+    stopAudio()
+
+    const audio = new Audio(call.recording_link)
+    audioRef.current = audio
+    setPlayingId(call.id)
+
+    const updateProgress = () => {
+      if (!audioRef.current) return
+      const a = audioRef.current
+
+      const duration = a.duration || 0
+      const current = a.currentTime || 0
+      const progress = duration > 0 ? current / duration : 0
+
+      setPlayProgress((prev) => ({
+        ...prev,
+        [call.id]: progress
+      }))
+
+      rafRef.current = requestAnimationFrame(updateProgress)
+    }
+
+    audio.addEventListener("ended", () => {
+      stopAudio()
+    })
+
+    audio
+      .play()
+      .then(() => {
+        rafRef.current = requestAnimationFrame(updateProgress)
+      })
+      .catch((err) => {
+        toast.error("Failed to play audio")
+        console.error("Audio playback error:", err)
+        stopAudio()
+      })
+  }, [stopAudio])
+
 
   // Debounce search
   useEffect(() => {
@@ -168,10 +306,30 @@ const CallRecordsPage = () => {
     fetchCallLogs()
   }, [fetchCallLogs])
 
+  const fetchUnreadCount = useCallback(async () => {
+    if (!token || !isAuthenticated) return
+
+    try {
+      const response = await callLogsApi.getUnreadCount()
+      setUnreadCount(response.unread_count)
+
+      // Dispatch custom event for menu badge update
+      window.dispatchEvent(new CustomEvent('unreadCallLogsUpdated', {
+        detail: { count: response.unread_count }
+      }))
+    } catch (err) {
+      console.error('Failed to fetch unread count:', err)
+    }
+  }, [token, isAuthenticated])
+
+  // Fetch unread count on mount and when call logs change
+  useEffect(() => {
+    fetchUnreadCount()
+  }, [fetchUnreadCount, callLogs])
+
   const handleCallLogCreated = useCallback((data: any) => {
     console.log('📞 New call log created:', data)
 
-    // CRITICAL FIX: Prevent duplicate toasts using conversation_id
     const notificationKey = `call_${data.conversation_id || data.id}`
 
     if (shownNotifications.current.has(notificationKey)) {
@@ -179,15 +337,12 @@ const CallRecordsPage = () => {
       return
     }
 
-    // Mark as shown
     shownNotifications.current.add(notificationKey)
 
-    // Clean up old notifications after 30 seconds
     setTimeout(() => {
       shownNotifications.current.delete(notificationKey)
     }, 30000)
 
-    // Show toast notification with caller info
     toast.success(
       <div>
         <strong>New Call Received</strong>
@@ -205,13 +360,15 @@ const CallRecordsPage = () => {
         closeOnClick: true,
         pauseOnHover: true,
         draggable: true,
-        toastId: notificationKey // CRITICAL: Prevents duplicate toasts with same ID
+        toastId: notificationKey
       }
     )
 
-    // Refresh call logs to show new data
+    // Refresh both call logs and unread count
     fetchCallLogs()
-  }, [fetchCallLogs]);
+    fetchUnreadCount()
+  }, [fetchCallLogs, fetchUnreadCount])
+
 
   // ===== REAL-TIME UPDATES =====
   // const { isConnected: realtimeConnected } = useRealtimeUpdates({
@@ -278,12 +435,32 @@ const CallRecordsPage = () => {
   }, [currentPage, totalPages])
 
   // Handle view details
-  const handleViewDetails = useCallback((call: CallLog) => {
+  const handleViewDetails = useCallback(async (call: CallLog) => {
     setSelectedCall(call)
     setShowDetailModal(true)
     setAudioError(null)
-    // Don't set openedFromComplaints for regular opens
-  }, [])
+
+    // Mark as read if currently unread
+    if (!call.view_status) {
+      try {
+        await callLogsApi.markAsRead(call.id)
+
+        // Update local state
+        setCallLogs(prev => prev.map(log =>
+          log.id === call.id ? { ...log, view_status: true } : log
+        ))
+
+        // Refresh unread count
+        fetchUnreadCount()
+
+        // toast.success('Call log marked as read')
+      } catch (err) {
+        console.error('Failed to mark as read:', err)
+        // Don't show error toast - it's not critical
+      }
+    }
+  }, [fetchUnreadCount])
+
 
   // Handle back to complaints
   const handleBackToComplaints = useCallback(() => {
@@ -472,46 +649,82 @@ const CallRecordsPage = () => {
       //     </Badge>
       //   )
       // },
+      // In the Actions column, replace the current play button code:
       {
-        key: 'actions',
-        header: 'Actions',
-        width: 150,
-        align: 'center',
-        sticky: 'right',
+        key: "actions",
+        header: "Actions",
+        width: 160,
+        align: "center",
+        sticky: "right",
         defaultSticky: true,
-        render: (call) => (
-          <div className="d-flex gap-2 justify-content-left">
-            <Button
-              variant="outline-primary"
-              size="sm"
-              onClick={() => handleViewDetails(call)}
-              title="View Details"
-            >
-              <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
-            </Button>
+        render: (call) => {
+          const isPlaying = playingId === call.id
+          const progress = playProgress[call.id] || 0
 
-            <Button
-              variant={call.recording_link ? "outline-success" : "outline-secondary"}
-              size="sm"
-              href={call.recording_link || undefined}
-              target={call.recording_link ? "_blank" : undefined}
-              rel={call.recording_link ? "noopener noreferrer" : undefined}
-              disabled={!call.recording_link}
-              title={call.recording_link ? "Play Recording" : "Recording not available"}
-              style={{
-                pointerEvents: call.recording_link ? "auto" : "none",
-                opacity: call.recording_link ? 1 : 0.45,
-                cursor: call.recording_link ? "pointer" : "not-allowed",
-              }}
-            >
-              <IconifyIcon icon="solar:play-linear" width={16} height={16} />
-            </Button>
-          </div>
-        )
+          return (
+            <div className="d-flex gap-2 justify-content-left">
+              <Button
+                variant="outline-primary"
+                size="sm"
+                onClick={() => handleViewDetails(call)}
+                title="View Details"
+              >
+                <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
+              </Button>
 
+              {/* ✅ Recording button always visible */}
+              {call.recording_link ? (
+                isPlaying ? (
+                  <ProgressButton
+                    progress={progress}
+                    onClick={(e?: any) => {
+                      e?.stopPropagation?.()
+                      stopAudio()
+                    }}
+                    title="Stop Recording"
+                    variant="outline-danger"
+                    icon={<IconifyIcon icon="solar:stop-linear" width={16} height={16} />}
+                  />
+                ) : (
+                  <Button
+                    variant="outline-success"
+                    size="sm"
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      playAudio(call)
+                    }}
+                    title="Play Recording"
+                  >
+                    <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+                  </Button>
+                )
+              ) : (
+                <Button
+                  variant="outline-secondary"
+                  size="sm"
+                  disabled
+                  title="Recording not available"
+                  style={{ opacity: 0.45 }}
+                >
+                  <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+                </Button>
+              )}
+            </div>
+          )
+        },
       }
+
+
     ],
-    [startIndex, handleViewDetails]
+    [
+      startIndex,
+      handleViewDetails,
+      playingId,
+      playProgress,
+      playAudio,
+      stopAudio,
+    ]
+
   )
 
   // Toolbar filters
@@ -596,7 +809,7 @@ const CallRecordsPage = () => {
             </div>
 
             {/* Real-time connection indicator */}
-            {/* {realtimeConnected && (
+            {realtimeConnected && (
               <div
                 className="d-inline-flex align-items-center gap-2 px-3 py-1 rounded-pill"
                 style={{
@@ -610,20 +823,20 @@ const CallRecordsPage = () => {
                   style={{
                     width: 8,
                     height: 8,
-                    background: '#cc2e2eff',
+                    background: '#2b9900ff',
                     animation: 'pulse 1.6s ease-in-out infinite'
                   }}
                 />
                 <span className="text-success">Live Updates</span>
               </div>
-            )} */}
+            )}
 
             {/* </div> */}
           </div>
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         <Col xs={12}>
           <DataTable
             id="call-records-table"

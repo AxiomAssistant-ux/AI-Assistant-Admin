@@ -61,6 +61,18 @@ export interface UpdateActionItemRequest {
   due_at?: string | null
 }
 
+export interface ActionItemStatsResponse {
+  total_items: number
+  by_status: Record<string, number>
+  by_urgency: Record<string, number>
+  org_id: string
+}
+
+export interface PendingUrgentCountResponse {
+  pending_urgent_count: number
+}
+
+
 const getAuthHeaders = () => {
   const token = localStorage.getItem('access_token')
   return token ? { Authorization: `Bearer ${token}` } : {}
@@ -102,8 +114,22 @@ export const actionItemsApi = {
     })
   },
 
-  async getStats(): Promise<any> {
+  async getStatss(): Promise<any> {
     const response = await axios.get(`${API_BASE}/org/action-items/stats/summary`, {
+      headers: getAuthHeaders()
+    })
+    return response.data
+  },
+
+  async getStats(): Promise<ActionItemStatsResponse> {
+    const response = await axios.get(`${API_BASE}/org/action-items/stats/summary`, {
+      headers: getAuthHeaders()
+    })
+    return response.data
+  },
+
+  async getPendingUrgentCount(): Promise<PendingUrgentCountResponse> {
+    const response = await axios.get(`${API_BASE}/org/action-items/stats/pending-urgent-count`, {
       headers: getAuthHeaders()
     })
     return response.data

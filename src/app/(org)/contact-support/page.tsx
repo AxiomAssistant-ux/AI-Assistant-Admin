@@ -341,7 +341,7 @@ const ContactSupportPage = () => {
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         <Col lg={4} className="mb-3">
           <Card className="h-100">
             <CardBody className="text-center">

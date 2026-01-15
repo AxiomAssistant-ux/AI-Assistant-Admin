@@ -12,6 +12,8 @@ import { appointmentsApi } from '@/api/org/appointments'
 import { ordersApi } from '@/api/org/orders'
 import { orgUsersApi } from '@/api/org/users'
 import { supportApi } from '@/api/org/support'
+import { complaintsApi } from '@/api/org/complaints'
+
 import dynamic from 'next/dynamic'
 
 const ReactApexChart = dynamic(() => import('react-apexcharts'), {
@@ -41,7 +43,7 @@ const DashboardPage = () => {
   const [supportStats, setSupportStats] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-
+  const [complaintsStats, setComplaintsStats] = useState<any>(null)
 
 
   const loadDashboardData = useCallback(async () => {
@@ -49,14 +51,17 @@ const DashboardPage = () => {
       setLoading(true)
       setError(null)
 
-      const [dashboardData, actionData, appointmentData, orderData, userData, supportData] = await Promise.all([
-        analyticsApi.getDashboard(period),
-        actionItemsApi.getStats(),
-        appointmentsApi.getStats(),
-        ordersApi.getStats(),
-        orgUsersApi.getStats(),
-        supportApi.getStats(),
-      ])
+      const [dashboardData, actionData, appointmentData, orderData, userData, supportData, complaintsData] =
+        await Promise.all([
+          analyticsApi.getDashboard(period),
+          actionItemsApi.getStats(),
+          appointmentsApi.getStats(),
+          ordersApi.getStats(),
+          orgUsersApi.getStats(),
+          supportApi.getStats(),
+          complaintsApi.getStats(),
+        ])
+
 
       setDashboard(dashboardData)
       setActionStats(actionData)
@@ -64,6 +69,8 @@ const DashboardPage = () => {
       setOrderStats(orderData)
       setUserStats(userData)
       setSupportStats(supportData)
+      setComplaintsStats(complaintsData)
+
     } catch (err: any) {
       console.error('Error loading dashboard:', err)
       setError(err.response?.data?.detail || err.message || 'Failed to load dashboard data')
@@ -435,7 +442,7 @@ const DashboardPage = () => {
           </Card>
         </Col>
 
-        <Col lg={3} md={6}>
+        {/* <Col lg={3} md={6}>
           <Card className="border-0 shadow-sm">
             <CardBody>
               <div className="d-flex justify-content-between align-items-start">
@@ -467,7 +474,29 @@ const DashboardPage = () => {
               </div>
             </CardBody>
           </Card>
+        </Col> */}
+
+        <Col lg={3} md={6}>
+          <Card className="border-0 shadow-sm">
+            <CardBody>
+              <div className="d-flex justify-content-between align-items-start">
+                <div>
+                  <p className="text-muted mb-1 small">Complaints</p>
+                  <h4 className="mb-0">{complaintsStats?.total_complaints || 0}</h4>
+
+                  <Badge bg="danger" className="mt-2">
+                    {complaintsStats?.by_status?.open || 0} open
+                  </Badge>
+                </div>
+
+                <Link href="/complaints" className="btn btn-sm btn-outline-primary">
+                  <IconifyIcon icon="solar:arrow-right-linear" width={16} height={16} />
+                </Link>
+              </div>
+            </CardBody>
+          </Card>
         </Col>
+
 
         <Col lg={3} md={6}>
           <Card className="border-0 shadow-sm">

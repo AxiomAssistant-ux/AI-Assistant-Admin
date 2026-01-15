@@ -434,7 +434,7 @@ const LocationsPage = () => {
         </Col>
       </Row>
 
-      <Row className="mt-4">
+      <Row className="">
         <Col xs={12}>
           <DataTable
             id="locations-table"

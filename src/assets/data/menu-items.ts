@@ -131,11 +131,11 @@ export const PLATFORM_MENU_ITEMS: MenuItemType[] = [
    ===================================================== */
 
 export const ORG_MENU_ITEMS: MenuItemType[] = [
-  {
-    key: 'menu',
-    label: 'MENU',
-    isTitle: true,
-  },
+  // {
+  //   key: 'menu',
+  //   label: 'MENU',
+  //   isTitle: true,
+  // },
   {
     key: 'org-dashboard',
     label: 'Dashboard',
@@ -159,14 +159,14 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     label: 'Action Items',
     icon: 'solar:checklist-outline',
     url: '/action-items',
-    badge: { variant: 'danger', text: '3' },
+    // badge: { variant: 'danger', text: '3' },
   },
   {
     key: 'call-records',
     label: 'Call Records',
     icon: 'solar:call-chat-outline',
     url: '/call-records',
-    badge: { variant: 'warning', text: '3' },
+    // badge: { variant: 'warning', text: '0' }, // Will be updated dynamically
   },
   {
     key: 'complaints',
