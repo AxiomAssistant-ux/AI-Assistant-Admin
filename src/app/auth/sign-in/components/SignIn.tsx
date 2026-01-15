@@ -1,6 +1,7 @@
 'use client'
 import DarkLogo from '@/assets/images/logo-dark.png'
 import LightLogo from '@/assets/images/logo-light.png'
+import SmallLogo from '@/assets/images/logo-sm.png'
 import TextFormInput from '@/components/from/TextFormInput'
 import PasswordFormInput from '@/components/from/PasswordFormInput'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
@@ -161,10 +162,10 @@ const SignIn = () => {
             <div className="text-center mb-4">
               <div className="auth-logo mb-4">
                 <Link href="/" className="logo-dark">
-                  <Image src={DarkLogo} height={40} alt="logo dark" />
+                  <Image src={SmallLogo} height={80} alt="logo dark" />
                 </Link>
                 <Link href="/" className="logo-light">
-                  <Image src={LightLogo} height={36} alt="logo light" />
+                  <Image src={SmallLogo} height={80} alt="logo light" />
                 </Link>
               </div>
               <h3 className="fw-bold text-dark mb-2">Sign In</h3>
