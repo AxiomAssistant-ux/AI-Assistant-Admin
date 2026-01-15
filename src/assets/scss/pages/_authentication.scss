@@ -4,7 +4,7 @@
 
 body {
      &.authentication-bg {
-          background: linear-gradient(90deg, hsl(220, 75%, 40%) 0%, hsl(240, 60%, 35%) 100%);
+          background: linear-gradient(90deg, hsl(0, 75%, 40%) 0%, hsl(0, 0%, 0%) 100%);
 
           .account-pages {
                align-items: center;
@@ -34,7 +34,7 @@ body {
 .split-left {
      flex: 1;
      position: relative;
-     background: linear-gradient(135deg, #1e3a8a 0%, #1d4ed8 50%, #0f172a 100%);
+     background: linear-gradient(135deg, #8a1e1e 0%, #d81d1d 50%, #2a0f0f 100%);
      overflow: hidden;
      display: flex;
      align-items: center;
@@ -339,7 +339,7 @@ body {
 
 // Modern submit button
 .modern-submit-btn {
-     background: linear-gradient(135deg, #3b82f6, #1e40af) !important;
+     background: linear-gradient(135deg, #f63b3b, #4b0d0d) !important;
      border: none !important;
      padding: 0.875rem 1.5rem !important;
      border-radius: 0.75rem !important;

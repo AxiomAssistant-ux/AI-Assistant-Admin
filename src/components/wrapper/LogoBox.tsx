@@ -9,11 +9,11 @@ const LogoBox = () => {
     <div className="logo-box justify-content-left align-items-left d-flex">
       <Link href="/dashboards" className="logo-dark">
         <Image width={28} height={28} src={logoSm} className="logo-sm" alt="logo sm" />
-        <Image width={150} height={35} src={logoDark} className="logo-lg" alt="logo dark" />
+        <Image width={170} height={35} src={logoDark} className="logo-lg" alt="logo dark" />
       </Link>
       <Link href="/dashboards" className="logo-light">
         <Image width={28} height={28} src={logoSm} className="logo-sm" alt="logo sm" />
-        <Image width={150} height={35} src={logoLight} className="logo-lg" alt="logo light" />
+        <Image width={170} height={35} src={logoLight} className="logo-lg" alt="logo light" />
       </Link>
     </div>
   )
