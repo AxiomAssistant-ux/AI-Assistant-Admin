@@ -1,6 +1,6 @@
 // src/hooks/useActiveCalls.ts
 import { useEffect, useState, useCallback } from 'react'
-import { useRealtimeUpdates } from './useRealtimeUpdates'
+// import { useRealtimeUpdates } from './useRealtimeUpdates'
 
 export interface ActiveCall {
   call_sid: string

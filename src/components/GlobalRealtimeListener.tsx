@@ -1,8 +1,8 @@
 'use client'
 
-import { useCallback, useEffect, useRef } from 'react'
+import { useCallback, useRef } from 'react'
 import { toast } from 'react-toastify'
-import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates'
+import { useSocketIO } from '@/hooks/useSocketIO'
 
 export default function GlobalRealtimeListener() {
   const shownNotifications = useRef<Set<string>>(new Set())
@@ -40,18 +40,50 @@ export default function GlobalRealtimeListener() {
       }
     )
 
-    // ✅ trigger refresh for whole app
+    // ✅ refresh call logs everywhere
     window.dispatchEvent(
       new CustomEvent('call_logs_refresh', {
         detail: { reason: 'call_log_created', data }
       })
     )
+
+    // ✅ refresh unread count everywhere
+    window.dispatchEvent(
+      new CustomEvent('unread_count_refresh', {
+        detail: { reason: 'call_log_created', data }
+      })
+    )
+
   }, [])
 
-  useRealtimeUpdates({
+  const handleActiveCallsUpdated = useCallback((data: any) => {
+    console.log('📞 Global: Active calls updated:', data)
+
+    // ✅ trigger update for badge hook
+    window.dispatchEvent(
+      new CustomEvent('active_calls_updated', {
+        detail: data
+      })
+    )
+
+    // optional toast
+    if (data.count > 0) {
+      toast.info(
+        `${data.count} active call${data.count > 1 ? 's' : ''} in progress`,
+        {
+          position: 'top-right',
+          autoClose: 2000,
+          hideProgressBar: true,
+        }
+      )
+    }
+  }, [])
+
+  useSocketIO({
     onCallLogCreated: handleCallLogCreated,
-    onConnect: () => console.log('✅ Global realtime connected'),
-    onDisconnect: () => console.log('❌ Global realtime disconnected'),
+    onActiveCallsUpdated: handleActiveCallsUpdated,
+    onConnect: () => console.log('✅ Global Socket.IO connected'),
+    onDisconnect: () => console.log('❌ Global Socket.IO disconnected'),
   })
 
   return null

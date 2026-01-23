@@ -13,7 +13,11 @@ import { toast } from 'react-toastify'
 import { callLogsApi, type CallLog, type CallLogsListParams } from '@/api/org/call-logs'
 import { locationsApi, type Location } from '@/api/org/locations'
 import { useFeatureGuard } from '@/hooks/useFeatureGuard'
-import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates'
+// import { useRealtimeUpdates } from '@/hooks/useRealtimeUpdates'
+import { useSocketIO } from '@/hooks/useSocketIO'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
+import { useRealtimeStatus } from '@/hooks/useRealtimeStatus'
+
 
 // Enhanced Progress Button for Audio Playback
 const ProgressButton = ({
@@ -113,6 +117,7 @@ const CallRecordsPage = () => {
 
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(10)
+
 
   const [selectedCall, setSelectedCall] = useState<CallLog | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
@@ -322,14 +327,27 @@ const CallRecordsPage = () => {
     fetchUnreadCount()
   }, [fetchCallLogs, fetchUnreadCount])
 
-  const { isConnected: realtimeConnected } = useRealtimeUpdates({
-    onCallLogCreated: handleCallLogCreated,
-    onActiveCallsUpdated: (data) => {
-      console.log('📞 Active calls updated on page:', data)
-    },
-    onConnect: () => console.log('✅ Real-time updates connected'),
-    onDisconnect: () => console.log('❌ Real-time updates disconnected')
-  })
+  // const { isConnected: realtimeConnected } = useSocketIO({
+  //   onCallLogCreated: (data) => {
+  //     console.log('📞 New call log received on page:', data)
+  //     // Optionally: Show page-specific notification
+  //     // The global listener already shows a toast
+  //   },
+  //   onConnect: () => console.log('✅ Page: Real-time connected'),
+  //   onDisconnect: () => console.log('❌ Page: Real-time disconnected')
+  // })
+
+  // ✅ AUTO-REFRESH WHEN EVENTS HAPPEN
+  // useRealtimeRefresh(fetchCallLogs)
+  // useRealtimeRefresh(fetchUnreadCount)
+  const { isConnected: realtimeConnected } = useRealtimeStatus()
+
+
+  useRealtimeRefresh(fetchCallLogs, ['call_logs_refresh'])
+  useRealtimeRefresh(fetchUnreadCount, ['unread_count_refresh'])
+
+
+
 
   useEffect(() => {
     const loadSpecificCallLog = async () => {
@@ -775,6 +793,29 @@ const CallRecordsPage = () => {
                 <li className="breadcrumb-item active">Call Records</li>
               </ol>
             </div>
+
+            {/* {realtimeConnected && (
+              <div
+                className="d-inline-flex align-items-center gap-2 px-3 py-2 rounded-pill"
+                style={{
+                  background: '#E9F7EF',
+                  border: '1.5px solid #B7E4C7',
+                  fontSize: 13,
+                  fontWeight: 600
+                }}
+              >
+                <span
+                  className="rounded-circle"
+                  style={{
+                    width: 8,
+                    height: 8,
+                    background: '#28a745',
+                    animation: 'pulse 1.6s ease-in-out infinite'
+                  }}
+                />
+                <span style={{ color: '#1e7e34' }}>Live Updates Active</span>
+              </div>
+            )} */}
 
             {realtimeConnected && (
               <div

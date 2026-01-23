@@ -23,9 +23,9 @@ const AdminLayout = ({ children }: ChildrenType) => {
         <VerticalNavigationBar />
         <div className="page-content">
           <Container fluid>
+            <GlobalRealtimeListener />       
             {children}
-            {/* <VerticalDebug /> */}
-            <GlobalRealtimeListener />            
+            {/* <VerticalDebug /> */}     
           </Container>
           <Footer />
         </div>
