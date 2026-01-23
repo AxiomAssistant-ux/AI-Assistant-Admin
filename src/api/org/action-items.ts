@@ -30,6 +30,7 @@ export interface ActionItemsListParams {
   urgency_filter?: ActionItemUrgency
   type_filter?: ActionItemType
   assigned_to_me?: boolean
+  assigned_to_user_id?: string | null // ✅ NEW
   sort?: 'newest' | 'oldest' | 'due_date'
 }
 
@@ -49,6 +50,7 @@ export interface CreateActionItemRequest {
   assigned_to_user_id?: string | null
   assigned_role?: string | null
   due_at?: string | null
+  callback_timeline_hours?: number | null  // NEW: For auto-calculating due_at
 }
 
 export interface UpdateActionItemRequest {
@@ -112,13 +114,6 @@ export const actionItemsApi = {
     await axios.delete(`${API_BASE}/org/action-items/${id}`, {
       headers: getAuthHeaders()
     })
-  },
-
-  async getStatss(): Promise<any> {
-    const response = await axios.get(`${API_BASE}/org/action-items/stats/summary`, {
-      headers: getAuthHeaders()
-    })
-    return response.data
   },
 
   async getStats(): Promise<ActionItemStatsResponse> {

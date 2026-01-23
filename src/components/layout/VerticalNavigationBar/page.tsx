@@ -9,12 +9,14 @@ import { useAuth } from '@/context/useAuthContext'
 import { getAccessibleMenuItems, getMenuItems } from '@/helpers/Manu'
 import { useCallLogsBadge } from '@/hooks/useCallLogsBadge'
 import { useActionItemsBadge } from '@/hooks/useActionItemsBadge'
+import { useComplaintsBadge } from '@/hooks/useComplaintsBadge'
 import type { MenuItemType } from '@/types/menu'
 
 const Page = () => {
   const { user } = useAuth()
   const unreadCallLogsCount = useCallLogsBadge()
   const pendingUrgentActionItemsCount = useActionItemsBadge()
+  const { pendingCount, inProgressCount } = useComplaintsBadge()
 
   // Get base menu items
   const baseMenuItems = useMemo(() => {
@@ -28,7 +30,7 @@ const Page = () => {
     if (!baseMenuItems) return []
 
     return baseMenuItems.map((item: MenuItemType) => {
-      // Update Call Records badge with unread count
+      // Update Call Records badge
       if (item.key === 'call-records') {
         return {
           ...item,
@@ -38,7 +40,7 @@ const Page = () => {
         }
       }
       
-      // Update Action Items badge with pending urgent count
+      // Update Action Items badge
       if (item.key === 'action-items') {
         return {
           ...item,
@@ -48,9 +50,49 @@ const Page = () => {
         }
       }
       
+      // Update Complaints badge - ONLY show pending count on parent
+      if (item.key === 'complaints') {
+        return {
+          ...item,
+          // Parent badge shows ONLY pending count
+          badge: pendingCount > 0 
+            ? { variant: 'danger', text: String(pendingCount) }
+            : undefined,
+          // Update children badges
+          children: item.children?.map((child) => {
+            // Pending child - show badge
+            if (child.key === 'nav_complaints__pending') {
+              return {
+                ...child,
+                badge: pendingCount > 0 
+                  ? { variant: 'danger', text: String(pendingCount) }
+                  : undefined
+              }
+            }
+            // In Progress child - show badge
+            if (child.key === 'nav_complaints__in_progress') {
+              return {
+                ...child,
+                badge: inProgressCount > 0 
+                  ? { variant: 'warning', text: String(inProgressCount) }
+                  : undefined
+              }
+            }
+            // Resolved child - NO badge
+            if (child.key === 'nav_complaints__resolved') {
+              return {
+                ...child,
+                badge: undefined // Explicitly no badge
+              }
+            }
+            return child
+          })
+        }
+      }
+      
       return item
     })
-  }, [baseMenuItems, unreadCallLogsCount, pendingUrgentActionItemsCount])
+  }, [baseMenuItems, unreadCallLogsCount, pendingUrgentActionItemsCount, pendingCount, inProgressCount])
 
   return (
     <div className="app-sidebar">

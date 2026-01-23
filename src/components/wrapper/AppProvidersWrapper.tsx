@@ -11,6 +11,7 @@ import { VoicesProvider } from '@/context/useVoicesContext'
 import { ChildrenType } from '@/types/component-props'
 import { RealtimeProvider } from '@/context/RealtimeContext'
 
+
 const AppProvidersWrapper = ({ children }: ChildrenType) => {
   return (
     <SessionProvider>

@@ -2,8 +2,17 @@ import axios from 'axios'
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000/api/v1'
 
-export type ComplaintStatus = 'open' | 'in_progress' | 'resolved' | 'closed'
+// ONLY 3 STATES
+export type ComplaintStatus = 'pending' | 'in_progress' | 'resolved'
 export type ComplaintSeverity = 'low' | 'medium' | 'high' | 'critical'
+
+export interface PendingComplaintsCountResponse {
+  pending_count: number
+}
+
+export interface InProgressComplaintsCountResponse {
+  in_progress_count: number
+}
 
 export interface ComplaintCustomer {
   customer_name?: string
@@ -95,7 +104,7 @@ export const complaintsApi = {
       params,
       paramsSerializer: (params) => {
         const searchParams = new URLSearchParams()
-        
+
         Object.entries(params).forEach(([key, value]) => {
           if (Array.isArray(value)) {
             value.forEach((item) => {
@@ -105,14 +114,14 @@ export const complaintsApi = {
             searchParams.append(key, String(value))
           }
         })
-        
+
         return searchParams.toString()
       },
       headers: getAuthHeaders()
     })
     return response.data
   },
-  
+
   async getById(id: string): Promise<Complaint> {
     const response = await axios.get(`${API_BASE}/org/complaints/${id}`, {
       headers: getAuthHeaders()
@@ -129,6 +138,20 @@ export const complaintsApi = {
 
   async getStats(): Promise<ComplaintStatsResponse> {
     const response = await axios.get(`${API_BASE}/org/complaints/stats/summary`, {
+      headers: getAuthHeaders()
+    })
+    return response.data
+  },
+
+  async getPendingCount(): Promise<PendingComplaintsCountResponse> {
+    const response = await axios.get(`${API_BASE}/org/complaints/stats/pending-count`, {
+      headers: getAuthHeaders()
+    })
+    return response.data
+  },
+
+  async getInProgressCount(): Promise<InProgressComplaintsCountResponse> {
+    const response = await axios.get(`${API_BASE}/org/complaints/stats/in-progress-count`, {
       headers: getAuthHeaders()
     })
     return response.data

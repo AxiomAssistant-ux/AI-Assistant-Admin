@@ -1,9 +1,9 @@
 'use client'
 
 import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
-import { Row, Col, Button, Badge, Modal, Card, Form, Spinner } from 'react-bootstrap'
+import { Row, Col, Button, Badge, Modal, Card, Form, Spinner, Dropdown } from 'react-bootstrap'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import Footer from '@/components/layout/Footer'
 import { useAuth } from '@/context/useAuthContext'
@@ -14,7 +14,119 @@ import { complaintsApi, type Complaint, type ComplaintsListParams, type Complain
 import { callLogsApi, type CallLog } from '@/api/org/call-logs'
 import { locationsApi, type Location } from '@/api/org/locations'
 import { useFeatureGuard } from '@/hooks/useFeatureGuard'
+import { useRealtimeRefresh } from '@/hooks/useRealtimeRefresh'
 
+// Custom Status Dropdown Component
+const StatusDropdown = ({
+  currentStatus,
+  onStatusChange,
+  isUpdating = false,
+  disabled = false
+}: {
+  currentStatus: ComplaintStatus
+  onStatusChange: (newStatus: ComplaintStatus) => void
+  isUpdating?: boolean
+  disabled?: boolean
+}) => {
+  const statusConfig = {
+    pending: {
+      label: 'New',
+      icon: 'solar:clock-circle-bold',
+      color: '#dc3545',
+      bgColor: '#fff5f5'
+    },
+    in_progress: {
+      label: 'In Progress',
+      icon: 'solar:settings-bold',
+      color: '#fd7e14',
+      bgColor: '#fff8f0'
+    },
+    resolved: {
+      label: 'Resolved',
+      icon: 'solar:check-circle-bold',
+      color: '#198754',
+      bgColor: '#f0fdf4'
+    }
+  }
+
+  const current = statusConfig[currentStatus]
+
+  return (
+    <Dropdown>
+      <Dropdown.Toggle
+        variant="light"
+        disabled={disabled || isUpdating}
+        bsPrefix="dropdown-toggle-no-caret"
+        style={{
+          backgroundColor: current.bgColor,
+          border: `1.5px solid ${current.color}`,
+          color: current.color,
+          fontWeight: 600,
+          fontSize: '0.875rem',
+          padding: '0.5rem 1rem',
+          borderRadius: '8px',
+          minWidth: '140px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'space-between',
+          gap: '0.5rem'
+        }}
+      >
+        {isUpdating ? (
+          <>
+            <Spinner size="sm" />
+            <span>Updating...</span>
+          </>
+        ) : (
+          <>
+            <div className="d-flex align-items-center gap-2">
+              <IconifyIcon icon={current.icon} width={16} height={16} />
+              <span>{current.label}</span>
+            </div>
+          </>
+        )}
+        <IconifyIcon icon="solar:alt-arrow-down-bold" />
+
+      </Dropdown.Toggle>
+
+      <Dropdown.Menu style={{ minWidth: '180px' }}>
+        {Object.entries(statusConfig).map(([status, config]) => (
+          <Dropdown.Item
+            key={status}
+            onClick={() => onStatusChange(status as ComplaintStatus)}
+            active={currentStatus === status}
+            style={{
+              padding: '0.75rem 1rem',
+              display: 'flex',
+              alignItems: 'center',
+              gap: '0.75rem',
+              fontWeight: currentStatus === status ? 600 : 400
+            }}
+          >
+            <IconifyIcon
+              icon={config.icon}
+              width={18}
+              height={18}
+              style={{ color: config.color }}
+            />
+            <span>{config.label}</span>
+            {currentStatus === status && (
+              <IconifyIcon
+                icon="solar:check-circle-bold"
+                width={16}
+                height={16}
+                className="ms-auto"
+                style={{ color: config.color }}
+              />
+            )}
+          </Dropdown.Item>
+        ))}
+      </Dropdown.Menu>
+    </Dropdown>
+  )
+}
+
+// Enhanced Progress Button for Audio
 const ProgressButton = ({
   progress,
   onClick,
@@ -28,7 +140,7 @@ const ProgressButton = ({
   icon: React.ReactNode
   variant?: string
 }) => {
-  const size = 34
+  const size = 36
   const stroke = 3
   const radius = (size - stroke) / 2
   const circumference = 2 * Math.PI * radius
@@ -49,7 +161,7 @@ const ProgressButton = ({
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke="#ff0000ff"
+          stroke="#198754"
           strokeWidth={stroke}
           fill="transparent"
           strokeDasharray={circumference}
@@ -74,7 +186,7 @@ const ProgressButton = ({
           padding: 0,
           position: "relative",
           zIndex: 2,
-          borderRadius: 999,
+          borderRadius: '8px',
         }}
       >
         {icon}
@@ -83,18 +195,17 @@ const ProgressButton = ({
   )
 }
 
-
 const ComplaintsPage = () => {
   useFeatureGuard()
   const { token, isAuthenticated } = useAuth()
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [complaints, setComplaints] = useState<Complaint[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
 
-  // Location state
   const [locations, setLocations] = useState<Location[]>([])
   const [loadingLocations, setLoadingLocations] = useState(false)
   const [locationDropdownOpen, setLocationDropdownOpen] = useState(false)
@@ -112,11 +223,12 @@ const ComplaintsPage = () => {
   const [selectedComplaint, setSelectedComplaint] = useState<Complaint | null>(null)
   const [showDetailModal, setShowDetailModal] = useState(false)
 
-  // Call log modal state
   const [selectedCallLog, setSelectedCallLog] = useState<CallLog | null>(null)
   const [showCallLogModal, setShowCallLogModal] = useState(false)
   const [loadingCallLog, setLoadingCallLog] = useState(false)
   const [audioError, setAudioError] = useState<string | null>(null)
+
+  const [updatingStatusId, setUpdatingStatusId] = useState<string | null>(null)
 
   const shownNotifications = useRef<Set<string>>(new Set())
 
@@ -126,18 +238,25 @@ const ComplaintsPage = () => {
   const rafRef = useRef<number | null>(null)
   const playingIdRef = useRef<string | null>(null)
 
+  useEffect(() => {
+    const statusParam = searchParams.get('status')
+    if (statusParam) {
+      const validStatuses: ComplaintStatus[] = ['pending', 'in_progress', 'resolved']
+      if (validStatuses.includes(statusParam as ComplaintStatus)) {
+        setStatusFilter(statusParam as ComplaintStatus)
+      }
+    }
+  }, [searchParams])
 
   const stopAudio = useCallback((silent = true) => {
     const audio = audioRef.current
     const currentId = playingIdRef.current
 
-    // cancel animation
     if (rafRef.current) {
       cancelAnimationFrame(rafRef.current)
       rafRef.current = null
     }
 
-    // stop audio safely
     if (audio) {
       audio.pause()
       audio.currentTime = 0
@@ -152,17 +271,14 @@ const ComplaintsPage = () => {
     }
   }, [])
 
-
   const playAudio = useCallback(async (id: string, recordingLink: string) => {
     if (!recordingLink) return
 
-    // if same recording is already playing -> stop
     if (playingIdRef.current === id) {
       stopAudio()
       return
     }
 
-    // stop old audio first
     stopAudio(true)
 
     const audio = new Audio(recordingLink)
@@ -184,7 +300,7 @@ const ComplaintsPage = () => {
 
     audio.onended = () => stopAudio()
     audio.onerror = () => {
-      toast.error("Failed to play audio")
+      toast.error("Unable to play recording")
       stopAudio()
     }
 
@@ -192,23 +308,17 @@ const ComplaintsPage = () => {
       await audio.play()
       rafRef.current = requestAnimationFrame(updateProgress)
     } catch (err: any) {
-      // ✅ Ignore AbortError (happens when user clicks fast)
       if (err?.name === "AbortError") return
-
-      toast.error("Failed to play audio")
+      toast.error("Unable to play recording")
       console.error("Audio playback error:", err)
       stopAudio()
     }
   }, [stopAudio])
 
-
   useEffect(() => {
     return () => stopAudio()
   }, [stopAudio])
 
-
-
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery.trim().toLowerCase())
@@ -217,12 +327,10 @@ const ComplaintsPage = () => {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Reset to page 1 when filters change
   useEffect(() => {
     setCurrentPage(1)
   }, [debouncedSearch, statusFilter, severityFilter, selectedLocationIds])
 
-  // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       const target = event.target as HTMLElement
@@ -235,14 +343,12 @@ const ComplaintsPage = () => {
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [locationDropdownOpen])
 
-  // Fetch locations
   const fetchLocations = useCallback(async () => {
     if (!token || !isAuthenticated) return
 
     setLoadingLocations(true)
     try {
       const response = await locationsApi.list({ skip: 0, limit: 500 })
-      console.log('Locations loaded:', response.locations)
       setLocations(response.locations)
     } catch (err: any) {
       console.error('Failed to load locations:', err)
@@ -255,7 +361,6 @@ const ComplaintsPage = () => {
     fetchLocations()
   }, [fetchLocations])
 
-  // Fetch complaints
   const fetchComplaints = useCallback(async () => {
     if (!token || !isAuthenticated) {
       setLoading(false)
@@ -288,17 +393,13 @@ const ComplaintsPage = () => {
         params.location_ids = selectedLocationIds
       }
 
-      console.log('Fetching complaints with params:', params)
-
       const response = await complaintsApi.list(params)
-
-      console.log('Complaints received:', response.complaints.length)
 
       setComplaints(response.complaints)
       setTotal(response.total)
     } catch (err: any) {
       setError(err?.response?.data?.detail || err?.message || 'Failed to fetch complaints')
-      toast.error('Failed to load complaints')
+      toast.error('Unable to load complaints')
       setComplaints([])
     } finally {
       setLoading(false)
@@ -308,6 +409,34 @@ const ComplaintsPage = () => {
   useEffect(() => {
     fetchComplaints()
   }, [fetchComplaints])
+
+  useRealtimeRefresh(fetchComplaints)
+
+  const fetchAndUpdateBadgeCounts = useCallback(async () => {
+    if (!token || !isAuthenticated) return
+
+    try {
+      const [pendingResponse, inProgressResponse] = await Promise.all([
+        complaintsApi.getPendingCount(),
+        complaintsApi.getInProgressCount()
+      ])
+
+      window.dispatchEvent(new CustomEvent('complaintsCountUpdated', {
+        detail: {
+          pendingCount: pendingResponse.pending_count,
+          inProgressCount: inProgressResponse.in_progress_count
+        }
+      }))
+    } catch (err) {
+      console.error('Failed to fetch complaint counts:', err)
+    }
+  }, [token, isAuthenticated])
+
+  useEffect(() => {
+    if (!loading && complaints.length >= 0) {
+      fetchAndUpdateBadgeCounts()
+    }
+  }, [complaints, loading, fetchAndUpdateBadgeCounts])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const startIndex = (currentPage - 1) * pageSize
@@ -331,18 +460,38 @@ const ComplaintsPage = () => {
 
       playAudio(complaint.id, callLog.recording_link)
     } catch (err) {
-      toast.error("Failed to load recording")
+      toast.error("Unable to load recording")
     }
   }, [playAudio])
 
+  const handleStatusChange = useCallback(async (complaint: Complaint, newStatus: ComplaintStatus) => {
+    setUpdatingStatusId(complaint.id)
+    try {
+      await complaintsApi.updateStatus(complaint.id, { status: newStatus })
 
-  // Handle view details
+      setComplaints(prev => prev.map(c =>
+        c.id === complaint.id ? { ...c, status: newStatus, updated_at: new Date().toISOString() } : c
+      ))
+
+      if (selectedComplaint && selectedComplaint.id === complaint.id) {
+        setSelectedComplaint({ ...selectedComplaint, status: newStatus, updated_at: new Date().toISOString() })
+      }
+
+      window.dispatchEvent(new CustomEvent('complaintStatusChanged'))
+
+      toast.success(`Status updated successfully`)
+    } catch (err: any) {
+      toast.error(err.response?.data?.detail || 'Failed to update status')
+    } finally {
+      setUpdatingStatusId(null)
+    }
+  }, [selectedComplaint])
+
   const handleViewDetails = useCallback((complaint: Complaint) => {
     setSelectedComplaint(complaint)
     setShowDetailModal(true)
   }, [])
 
-  // Handle view related call log
   const handleViewCallLog = useCallback(async (callLogId: string) => {
     if (!token || !isAuthenticated) return
 
@@ -354,27 +503,20 @@ const ComplaintsPage = () => {
       setShowDetailModal(false)
       setSelectedCallLog(callLog)
       setShowCallLogModal(true)
-      // Keep complaint modal open in background
     } catch (err: any) {
-      toast.error('Failed to load call log details')
+      toast.error('Unable to load call details')
       console.error('Failed to fetch call log:', err)
     } finally {
       setLoadingCallLog(false)
     }
   }, [token, isAuthenticated])
 
-  // Navigate to call records page with specific call log
   const handleNavigateToCallLog = useCallback((callLogId: string) => {
-    // Close modals
     setShowDetailModal(false)
     setShowCallLogModal(false)
-
-    // Navigate to call records page
-    // The call records page will need to handle opening the modal via URL params or state
     router.push(`/call-records?openCallId=${callLogId}`)
   }, [router])
 
-  // Format datetime
   const formatDateTime = (dateString: string): string => {
     return new Date(dateString).toLocaleString('en-US', {
       year: 'numeric',
@@ -385,7 +527,6 @@ const ComplaintsPage = () => {
     })
   }
 
-  // Calculate duration
   const calculateDuration = (start: string, end: string): string => {
     const startTime = new Date(start).getTime()
     const endTime = new Date(end).getTime()
@@ -395,7 +536,6 @@ const ComplaintsPage = () => {
     return `${minutes}m ${seconds}s`
   }
 
-  // Get severity badge color
   const getSeverityBadgeColor = (severity?: string): string => {
     switch (severity) {
       case 'critical': return 'danger'
@@ -406,18 +546,16 @@ const ComplaintsPage = () => {
     }
   }
 
-  // Get status badge color
-  const getStatusBadgeColor = (status: string): string => {
-    switch (status) {
-      case 'open': return 'danger'
-      case 'in_progress': return 'warning'
-      case 'resolved': return 'success'
-      case 'closed': return 'secondary'
-      default: return 'secondary'
+  const getSeverityLabel = (severity?: string): string => {
+    switch (severity) {
+      case 'critical': return 'URGENT'
+      case 'high': return 'HIGH'
+      case 'medium': return 'MEDIUM'
+      case 'low': return 'LOW'
+      default: return 'N/A'
     }
   }
 
-  // Handle location checkbox toggle
   const handleLocationToggle = (locationId: string) => {
     setSelectedLocationIds(prev => {
       if (prev.includes(locationId)) {
@@ -428,21 +566,13 @@ const ComplaintsPage = () => {
     })
   }
 
-  // Clear all filters
-  const clearFilters = () => {
-    setStatusFilter('all')
-    setSeverityFilter('all')
-    setSelectedLocationIds([])
-    setCurrentPage(1)
+  const getPageTitle = () => {
+    if (statusFilter === 'pending') return 'New Complaints'
+    if (statusFilter === 'in_progress') return 'Complaints In Progress'
+    if (statusFilter === 'resolved') return 'Resolved Complaints'
+    return 'Customer Complaints'
   }
 
-  // Check if filters are dirty
-  const filtersDirty =
-    statusFilter !== 'all' ||
-    severityFilter !== 'all' ||
-    selectedLocationIds.length > 0
-
-  // Table columns
   const dataTableColumns: DataTableColumn<Complaint>[] = useMemo(
     () => [
       {
@@ -451,56 +581,69 @@ const ComplaintsPage = () => {
         width: 60,
         align: 'left',
         render: (_, { rowIndex }) => (
-          <span className="text-muted">{startIndex + rowIndex + 1}</span>
+          <span className="text-muted fw-semibold">{startIndex + rowIndex + 1}</span>
         )
       },
       {
         key: 'customer',
-        header: 'Customer',
-        minWidth: 130,
+        header: 'Customer Details',
+        minWidth: 180,
         render: (complaint) => (
           <div>
-            <div className="fw-semibold">{complaint.customer.customer_name || 'N/A'}</div>
+            <div className="fw-bold mb-1" style={{ fontSize: '0.95rem' }}>
+              {complaint.customer.customer_name || 'Unknown Customer'}
+            </div>
             {complaint.customer.contact_phone && (
-              <small className="text-muted d-block">{complaint.customer.contact_phone}</small>
+              <small className="text-muted d-flex align-items-center gap-1">
+                <IconifyIcon icon="solar:phone-linear" width={14} height={14} />
+                {complaint.customer.contact_phone}
+              </small>
             )}
             {complaint.customer.contact_email && (
-              <small className="text-muted d-block">{complaint.customer.contact_email}</small>
+              <small className="text-muted d-flex align-items-center gap-1 mt-1">
+                <IconifyIcon icon="solar:letter-linear" width={14} height={14} />
+                {complaint.customer.contact_email}
+              </small>
             )}
           </div>
         )
       },
       {
         key: 'store_info',
-        header: 'Store Info',
+        header: 'Store Location',
         minWidth: 150,
         render: (complaint) => (
           <div>
             {complaint.store.store_location && (
-              <div className="small">
-                <strong>{complaint.store.store_location}</strong>
+              <div className="fw-semibold mb-1">
+                {complaint.store.store_location}
               </div>
             )}
             {complaint.store.store_number && (
-              <Badge bg="secondary" className="mt-1">
+              <Badge
+                bg="light"
+                text="dark"
+                className="border"
+                style={{ fontSize: '0.75rem' }}
+              >
                 Store #{complaint.store.store_number}
               </Badge>
             )}
             {!complaint.store.store_number && !complaint.store.store_location && (
-              <span className="text-muted fst-italic">N/A</span>
+              <span className="text-muted fst-italic">Not specified</span>
             )}
           </div>
         )
       },
       {
         key: 'complaint_type',
-        header: 'Type',
+        header: 'Issue Type',
         minWidth: 150,
         render: (complaint) => (
           <div>
-            <div className="small fw-semibold">{complaint.complaint_type || 'N/A'}</div>
+            <div className="fw-semibold mb-1">{complaint.complaint_type || 'General Complaint'}</div>
             {complaint.receipt_status !== 'unknown' && (
-              <Badge bg="info" className="mt-1">
+              <Badge bg="info" className="text-capitalize" style={{ fontSize: '0.7rem' }}>
                 Receipt: {complaint.receipt_status}
               </Badge>
             )}
@@ -517,53 +660,75 @@ const ComplaintsPage = () => {
             style={{ maxWidth: '300px' }}
             title={complaint.complaint_description || ''}
           >
-            {complaint.complaint_description || 'No description'}
+            {complaint.complaint_description || 'No description provided'}
           </div>
         )
       },
       {
         key: 'severity',
-        header: 'Severity',
+        header: 'Priority',
         width: 120,
         align: 'left',
         render: (complaint) => (
-          <Badge bg={getSeverityBadgeColor(complaint.complaint_severity)}>
-            {complaint.complaint_severity?.toUpperCase() || 'N/A'}
+          <Badge
+            bg={getSeverityBadgeColor(complaint.complaint_severity)}
+            style={{ fontSize: '0.75rem', fontWeight: 600 }}
+          >
+            {getSeverityLabel(complaint.complaint_severity)}
           </Badge>
         )
       },
       {
         key: 'status',
-        header: 'Status',
-        width: 120,
+        header: 'Complaint Status',
+        width: 180,
         align: 'left',
         sticky: 'right',
         defaultSticky: true,
         render: (complaint) => (
-          <Badge bg={getStatusBadgeColor(complaint.status)}>
-            {complaint.status.replace('_', ' ').toUpperCase()}
-          </Badge>
+          <StatusDropdown
+            currentStatus={complaint.status}
+            onStatusChange={(newStatus) => handleStatusChange(complaint, newStatus)}
+            isUpdating={updatingStatusId === complaint.id}
+          />
         )
       },
       {
         key: 'escalation',
-        header: 'Escalation',
-        width: 120,
-        align: 'left',
+        header: 'Needs Callback',
+        width: 140,
+        align: 'center',
         sticky: 'right',
         defaultSticky: true,
         render: (complaint) => (
-          <Badge bg={complaint.escalation.manager_callback_needed ? 'danger' : 'secondary'}>
-            {complaint.escalation.manager_callback_needed ? 'Required' : 'None'}
-          </Badge>
+          <div className="d-flex justify-content-center">
+            {complaint.escalation.manager_callback_needed ? (
+              <Badge
+                bg="danger"
+                className="d-flex align-items-center gap-1"
+                style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem' }}
+              >
+                <IconifyIcon icon="solar:phone-calling-bold" width={14} height={14} />
+                Yes
+              </Badge>
+            ) : (
+              <Badge
+                bg="light"
+                text="muted"
+                style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem' }}
+              >
+                No
+              </Badge>
+            )}
+          </div>
         )
       },
       {
         key: 'created_at',
-        header: 'Created',
-        minWidth: 180,
+        header: 'Submitted',
+        minWidth: 160,
         render: (complaint) => (
-          <div className="small">{formatDateTime(complaint.created_at)}</div>
+          <div className="small text-muted">{formatDateTime(complaint.created_at)}</div>
         )
       },
       {
@@ -579,15 +744,15 @@ const ComplaintsPage = () => {
           return (
             <div className="d-flex gap-2 align-items-center">
               <Button
-                variant="outline-primary"
+                variant="primary"
                 size="sm"
                 onClick={() => handleViewDetails(complaint)}
-                title="View Details"
+                title="View Full Details"
+                style={{ borderRadius: '8px' }}
               >
-                <IconifyIcon icon="solar:eye-linear" width={16} height={16} />
+                <IconifyIcon icon="solar:eye-bold" width={16} height={16} />
               </Button>
 
-              {/* ✅ Play / Stop Recording */}
               {complaint.call_log_id ? (
                 isPlaying ? (
                   <ProgressButton
@@ -598,19 +763,20 @@ const ComplaintsPage = () => {
                     }}
                     title="Stop Recording"
                     variant="outline-danger"
-                    icon={<IconifyIcon icon="solar:stop-linear" width={16} height={16} />}
+                    icon={<IconifyIcon icon="solar:stop-bold" width={16} height={16} />}
                   />
                 ) : (
                   <Button
-                    variant="outline-success"
+                    variant="success"
                     size="sm"
                     onClick={(e) => {
                       e?.stopPropagation?.()
                       handlePlayFromComplaint(complaint)
                     }}
-                    title="Play Recording"
+                    title="Play Call Recording"
+                    style={{ borderRadius: '8px' }}
                   >
-                    <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+                    <IconifyIcon icon="solar:play-bold" width={16} height={16} />
                   </Button>
                 )
               ) : (
@@ -618,17 +784,16 @@ const ComplaintsPage = () => {
                   variant="outline-secondary"
                   size="sm"
                   disabled
-                  title="No Call Log Linked"
-                  style={{ opacity: 0.45 }}
+                  title="No Recording Available"
+                  style={{ opacity: 0.4, borderRadius: '8px' }}
                 >
-                  <IconifyIcon icon="solar:play-linear" width={16} height={16} />
+                  <IconifyIcon icon="solar:play-bold" width={16} height={16} />
                 </Button>
               )}
             </div>
           )
         }
       }
-
     ],
     [
       startIndex,
@@ -636,12 +801,12 @@ const ComplaintsPage = () => {
       playingId,
       playProgress,
       handlePlayFromComplaint,
-      stopAudio
+      stopAudio,
+      updatingStatusId,
+      handleStatusChange
     ]
-
   )
 
-  // Toolbar filters
   const toolbarFilters: DataTableFilterControl[] = useMemo(
     () => [
       {
@@ -650,33 +815,45 @@ const ComplaintsPage = () => {
         type: 'select',
         value: statusFilter === 'all' ? '' : statusFilter,
         options: [
-          { label: 'All', value: '' },
-          { label: 'Open', value: 'open' },
-          { label: 'In Progress', value: 'in_progress' },
-          { label: 'Resolved', value: 'resolved' },
-          { label: 'Closed', value: 'closed' }
+          { label: 'All Statuses', value: '' },
+          { label: 'New', value: 'pending' },
+          { label: 'Working On It', value: 'in_progress' },
+          { label: 'Resolved', value: 'resolved' }
         ],
         onChange: (value) => {
-          setStatusFilter((value || 'all') as any)
+          const newStatus = (value || 'all') as 'all' | ComplaintStatus
+          setStatusFilter(newStatus)
           setCurrentPage(1)
+
+          const params = new URLSearchParams(window.location.search)
+          if (newStatus === 'all') {
+            params.delete('status')
+          } else {
+            params.set('status', newStatus)
+          }
+          router.replace(`/complaints${params.toString() ? '?' + params.toString() : ''}`, { scroll: false })
         },
         onClear: statusFilter !== 'all' ? () => {
           setStatusFilter('all')
           setCurrentPage(1)
+
+          const params = new URLSearchParams(window.location.search)
+          params.delete('status')
+          router.replace(`/complaints${params.toString() ? '?' + params.toString() : ''}`, { scroll: false })
         } : undefined,
         width: 4
       },
       {
         id: 'severity-filter',
-        label: 'Severity',
+        label: 'Priority Level',
         type: 'select',
         value: severityFilter === 'all' ? '' : severityFilter,
         options: [
-          { label: 'All', value: '' },
+          { label: 'All Priorities', value: '' },
           { label: 'Low', value: 'low' },
           { label: 'Medium', value: 'medium' },
           { label: 'High', value: 'high' },
-          { label: 'Critical', value: 'critical' }
+          { label: 'Urgent', value: 'critical' }
         ],
         onChange: (value) => {
           setSeverityFilter((value || 'all') as any)
@@ -689,7 +866,7 @@ const ComplaintsPage = () => {
         width: 4
       }
     ],
-    [statusFilter, severityFilter]
+    [statusFilter, severityFilter, router]
   )
 
   if (!isAuthenticated) {
@@ -697,9 +874,11 @@ const ComplaintsPage = () => {
       <Row>
         <Col xs={12}>
           <div className="text-center py-5">
-            <p>Please sign in to view complaints.</p>
+            <IconifyIcon icon="solar:lock-password-linear" width={64} height={64} className="text-muted mb-3" />
+            <h4 className="mb-3">Authentication Required</h4>
+            <p className="text-muted mb-4">Please sign in to view and manage customer complaints.</p>
             <Link href="/auth/sign-in">
-              <Button variant="primary">Sign In</Button>
+              <Button variant="primary" size="lg">Sign In</Button>
             </Link>
           </div>
         </Col>
@@ -707,13 +886,15 @@ const ComplaintsPage = () => {
     )
   }
 
+
+
   return (
     <>
       <Row>
         <Col xs={12}>
           <div className="page-title-box d-flex flex-column flex-md-row justify-content-between align-items-md-center gap-3">
             <div>
-              <h4 className="mb-2">Complaints</h4>
+              <h4 className="mb-2">{getPageTitle()}</h4>
               <ol className="breadcrumb mb-0">
                 <li className="breadcrumb-item">
                   <Link href="/">AI Assistant</Link>
@@ -727,13 +908,12 @@ const ComplaintsPage = () => {
           </div>
         </Col>
       </Row>
-
-      <Row className="">
+      <Row>
         <Col xs={12}>
           <DataTable
             id="complaints-table"
-            title="Complaints"
-            description="Track and manage customer complaints with location filtering"
+            title={getPageTitle()}
+            description="Track and manage customer complaints across all locations"
             columns={dataTableColumns}
             data={complaints}
             rowKey={(complaint) => complaint.id}
@@ -745,7 +925,7 @@ const ComplaintsPage = () => {
               onToggleFilters: () => setShowFilters((prev) => !prev),
               search: {
                 value: searchQuery,
-                placeholder: 'Search by customer name, phone, email, or description...',
+                placeholder: 'Search by customer name, phone, email, or issue description...',
                 onChange: setSearchQuery,
                 onClear: () => setSearchQuery('')
               },
@@ -755,16 +935,17 @@ const ComplaintsPage = () => {
                   className="position-relative d-flex location-dropdown-container flex-grow-1"
                   style={{ width: 350 }}
                 >
-                  {/* Trigger */}
                   <button
                     type="button"
-                    className="btn shadow-sm border w-100 d-flex justify-content-between"
+                    className="btn shadow-sm border w-100 d-flex justify-content-between align-items-center"
+                    style={{ borderRadius: '8px', padding: '0.625rem 1rem' }}
                     onClick={() => setLocationDropdownOpen((v) => !v)}
                   >
-                    <span className="text-truncate">
+                    <span className="text-truncate d-flex align-items-center gap-2">
+                      <IconifyIcon icon="solar:map-point-linear" width={18} height={18} />
                       {selectedLocationIds.length === 0
-                        ? 'All Locations'
-                        : `${selectedLocationIds.length} selected`}
+                        ? 'Filter by Store Location'
+                        : `${selectedLocationIds.length} location${selectedLocationIds.length > 1 ? 's' : ''} selected`}
                     </span>
 
                     <div className="d-flex align-items-center gap-2">
@@ -785,7 +966,6 @@ const ComplaintsPage = () => {
                     </div>
                   </button>
 
-                  {/* Clear */}
                   {selectedLocationIds.length > 0 && (
                     <Button
                       variant="link"
@@ -801,20 +981,24 @@ const ComplaintsPage = () => {
                         e.stopPropagation()
                         setSelectedLocationIds([])
                       }}
-                      title="Clear locations"
+                      title="Clear location filters"
                     >
                       <IconifyIcon icon="solar:close-circle-linear" width={18} height={18} />
                     </Button>
                   )}
 
-                  {/* Dropdown */}
                   {locationDropdownOpen && (
                     <div
-                      className="position-absolute w-100 mt-2 bg-white border rounded shadow"
-                      style={{ maxHeight: 360, overflowY: 'auto', zIndex: 1050, top: '100%' }}
+                      className="position-absolute w-100 mt-2 bg-white border rounded shadow-lg"
+                      style={{
+                        maxHeight: 360,
+                        overflowY: 'auto',
+                        zIndex: 1050,
+                        top: '100%',
+                        borderRadius: '8px'
+                      }}
                     >
-                      {/* All */}
-                      <div className="px-3 py-2 border-bottom">
+                      <div className="px-3 py-2 border-bottom bg-light">
                         <Form.Check
                           type="checkbox"
                           checked={selectedLocationIds.length === 0}
@@ -823,21 +1007,20 @@ const ComplaintsPage = () => {
                         />
                       </div>
 
-                      {/* Loading */}
                       {loadingLocations && (
                         <div className="px-3 py-3 text-center">
-                          <Spinner size="sm" />
+                          <Spinner size="sm" className="me-2" />
+                          <span className="text-muted small">Loading locations...</span>
                         </div>
                       )}
 
-                      {/* Empty */}
                       {!loadingLocations && locations.length === 0 && (
-                        <div className="px-3 py-2 text-muted small">
-                          No locations available
+                        <div className="px-3 py-3 text-center text-muted small">
+                          <IconifyIcon icon="solar:map-point-linear" width={24} height={24} className="mb-2" />
+                          <div>No locations available</div>
                         </div>
                       )}
 
-                      {/* Locations */}
                       {!loadingLocations &&
                         locations.map((location) => {
                           const label = location.store_number
@@ -845,7 +1028,7 @@ const ComplaintsPage = () => {
                             : location.store_location
 
                           return (
-                            <div key={location.id} className="px-3 py-2">
+                            <div key={location.id} className="px-3 py-2 hover-bg-light">
                               <Form.Check
                                 type="checkbox"
                                 checked={selectedLocationIds.includes(location.id)}
@@ -883,8 +1066,8 @@ const ComplaintsPage = () => {
             emptyState={{
               title: 'No Complaints Found',
               description: debouncedSearch
-                ? 'Try adjusting your search or filter criteria.'
-                : 'There are no complaints available at this time.'
+                ? 'Try adjusting your search or filter criteria to find what you\'re looking for.'
+                : 'There are no customer complaints at this time. New complaints will appear here.'
             }}
           />
         </Col>
@@ -897,43 +1080,64 @@ const ComplaintsPage = () => {
         size="lg"
         centered
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Complaint Details</Modal.Title>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Complaint Details</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-3">
           {selectedComplaint && (
             <>
+              {/* Status Badge at Top */}
+              <div className="mb-4 d-flex justify-content-between align-items-center">
+                <div>
+                  <small className="text-muted d-block mb-2">Current Status</small>
+                  <StatusDropdown
+                    currentStatus={selectedComplaint.status}
+                    onStatusChange={(newStatus) => handleStatusChange(selectedComplaint, newStatus)}
+                    isUpdating={updatingStatusId === selectedComplaint.id}
+                  />
+                </div>
+                <div className="text-end">
+                  <small className="text-muted d-block mb-1">Priority Level</small>
+                  <Badge
+                    bg={getSeverityBadgeColor(selectedComplaint.complaint_severity)}
+                    style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}
+                  >
+                    {getSeverityLabel(selectedComplaint.complaint_severity)}
+                  </Badge>
+                </div>
+              </div>
+
               {/* Customer Info Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:user-linear" width={20} height={20} className="me-2" />
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:user-bold" width={20} height={20} className="text-primary" />
                     Customer Information
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <Row className="g-3">
                     <Col md={6}>
-                      <small className="text-muted d-block">Name</small>
-                      <strong>{selectedComplaint.customer.customer_name || '—'}</strong>
+                      <small className="text-muted d-block mb-1">Name</small>
+                      <strong>{selectedComplaint.customer.customer_name || 'Not provided'}</strong>
                     </Col>
                     <Col md={6}>
-                      <small className="text-muted d-block">Phone</small>
-                      <strong>{selectedComplaint.customer.contact_phone || '—'}</strong>
+                      <small className="text-muted d-block mb-1">Phone Number</small>
+                      <strong>{selectedComplaint.customer.contact_phone || 'Not provided'}</strong>
                     </Col>
                     <Col md={6}>
-                      <small className="text-muted d-block">Email</small>
-                      <strong>{selectedComplaint.customer.contact_email || '—'}</strong>
+                      <small className="text-muted d-block mb-1">Email Address</small>
+                      <strong>{selectedComplaint.customer.contact_email || 'Not provided'}</strong>
                     </Col>
                     <Col md={6}>
-                      <small className="text-muted d-block">Callback Confirmed</small>
+                      <small className="text-muted d-block mb-1">Callback Number Verified</small>
                       <Badge bg={selectedComplaint.customer.callback_phone_confirmed ? 'success' : 'secondary'}>
                         {selectedComplaint.customer.callback_phone_confirmed ? 'Yes' : 'No'}
                       </Badge>
                     </Col>
                     {selectedComplaint.customer.mailing_address && (
                       <Col xs={12}>
-                        <small className="text-muted d-block">Mailing Address</small>
+                        <small className="text-muted d-block mb-1">Mailing Address</small>
                         <strong>{selectedComplaint.customer.mailing_address}</strong>
                       </Col>
                     )}
@@ -942,10 +1146,10 @@ const ComplaintsPage = () => {
               </Card>
 
               {/* Store Info Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:shop-linear" width={20} height={20} className="me-2" />
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:shop-bold" width={20} height={20} className="text-primary" />
                     Store Information
                   </h6>
                 </Card.Header>
@@ -953,38 +1157,38 @@ const ComplaintsPage = () => {
                   <Row className="g-3">
                     {selectedComplaint.store.store_number && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Store Number</small>
+                        <small className="text-muted d-block mb-1">Store Number</small>
                         <strong>#{selectedComplaint.store.store_number}</strong>
                       </Col>
                     )}
                     {selectedComplaint.store.store_location && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Location</small>
-                        <Badge bg="secondary" className="px-2 py-1">
+                        <small className="text-muted d-block mb-1">Location</small>
+                        <Badge bg="secondary" className="px-3 py-2" style={{ fontSize: '0.875rem' }}>
                           {selectedComplaint.store.store_location}
                         </Badge>
                       </Col>
                     )}
                     {selectedComplaint.store.store_phone && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Store Phone</small>
+                        <small className="text-muted d-block mb-1">Store Phone</small>
                         <strong>{selectedComplaint.store.store_phone}</strong>
                       </Col>
                     )}
                     {selectedComplaint.store.store_address && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Store Address</small>
+                        <small className="text-muted d-block mb-1">Store Address</small>
                         <strong>{selectedComplaint.store.store_address}</strong>
                       </Col>
                     )}
                     {selectedComplaint.store.store_zip_code && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Zip Code</small>
+                        <small className="text-muted d-block mb-1">Zip Code</small>
                         <strong>{selectedComplaint.store.store_zip_code}</strong>
                       </Col>
                     )}
                     <Col md={6}>
-                      <small className="text-muted d-block">Customer At Store</small>
+                      <small className="text-muted d-block mb-1">Customer Currently at Store</small>
                       <Badge bg={selectedComplaint.store.customer_at_store ? 'success' : 'secondary'}>
                         {selectedComplaint.store.customer_at_store ? 'Yes' : 'No'}
                       </Badge>
@@ -994,73 +1198,69 @@ const ComplaintsPage = () => {
               </Card>
 
               {/* Complaint Details Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:document-text-linear" width={20} height={20} className="me-2" />
-                    Complaint Details
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:document-text-bold" width={20} height={20} className="text-primary" />
+                    Issue Details
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <Row className="g-3">
                     <Col md={6}>
-                      <small className="text-muted d-block">Type</small>
-                      <strong>{selectedComplaint.complaint_type || 'N/A'}</strong>
+                      <small className="text-muted d-block mb-1">Issue Type</small>
+                      <strong>{selectedComplaint.complaint_type || 'General Complaint'}</strong>
                     </Col>
                     <Col md={6}>
-                      <small className="text-muted d-block">Severity</small>
-                      <Badge bg={getSeverityBadgeColor(selectedComplaint.complaint_severity)}>
-                        {selectedComplaint.complaint_severity?.toUpperCase() || 'N/A'}
-                      </Badge>
+                      <small className="text-muted d-block mb-1">Receipt Status</small>
+                      <strong className="text-capitalize">{selectedComplaint.receipt_status || 'Unknown'}</strong>
                     </Col>
                     <Col md={6}>
-                      <small className="text-muted d-block">Receipt Status</small>
-                      <strong>{selectedComplaint.receipt_status || 'N/A'}</strong>
-                    </Col>
-                    <Col md={6}>
-                      <small className="text-muted d-block">Delivery Method</small>
-                      <strong>{selectedComplaint.delivery_method || 'N/A'}</strong>
+                      <small className="text-muted d-block mb-1">Delivery Method</small>
+                      <strong className="text-capitalize">{selectedComplaint.delivery_method || 'Not specified'}</strong>
                     </Col>
                     <Col xs={12}>
-                      <small className="text-muted d-block mb-1">Description</small>
-                      <p className="mb-0">{selectedComplaint.complaint_description || 'No description provided'}</p>
+                      <small className="text-muted d-block mb-2">Description</small>
+                      <p className="mb-0 p-3 bg-light rounded">
+                        {selectedComplaint.complaint_description || 'No description provided'}
+                      </p>
                     </Col>
                   </Row>
                 </Card.Body>
               </Card>
 
               {/* Resolution Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:check-circle-linear" width={20} height={20} className="me-2" />
-                    Resolution
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:check-circle-bold" width={20} height={20} className="text-success" />
+                    Resolution Offered
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <Row className="g-3">
                     {selectedComplaint.resolution.voucher_type && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Voucher Type</small>
-                        <strong>{selectedComplaint.resolution.voucher_type}</strong>
+                        <small className="text-muted d-block mb-1">Voucher Type</small>
+                        <strong className="text-capitalize">{selectedComplaint.resolution.voucher_type}</strong>
                       </Col>
                     )}
                     {selectedComplaint.resolution.voucher_value && (
                       <Col md={6}>
-                        <small className="text-muted d-block">Voucher Value</small>
+                        <small className="text-muted d-block mb-1">Voucher Value</small>
                         <strong>{selectedComplaint.resolution.voucher_value}</strong>
                       </Col>
                     )}
                     <Col md={6}>
-                      <small className="text-muted d-block">Immediate Replacement</small>
+                      <small className="text-muted d-block mb-1">Immediate Replacement</small>
                       <Badge bg={selectedComplaint.resolution.immediate_replacement_offered ? 'success' : 'secondary'}>
                         {selectedComplaint.resolution.immediate_replacement_offered ? 'Offered' : 'Not Offered'}
                       </Badge>
                     </Col>
                     {selectedComplaint.resolution.replacement_details && (
                       <Col xs={12}>
-                        <small className="text-muted d-block mb-1">Replacement Details</small>
-                        <p className="mb-0">{selectedComplaint.resolution.replacement_details}</p>
+                        <small className="text-muted d-block mb-2">Replacement Details</small>
+                        <p className="mb-0 p-3 bg-light rounded">{selectedComplaint.resolution.replacement_details}</p>
                       </Col>
                     )}
                   </Row>
@@ -1069,27 +1269,27 @@ const ComplaintsPage = () => {
 
               {/* Escalation Card */}
               {selectedComplaint.escalation.manager_callback_needed && (
-                <Card className="border-danger mb-3">
-                  <Card.Header className="bg-danger bg-opacity-10">
-                    <h6 className="mb-0 text-danger">
-                      <IconifyIcon icon="solar:danger-circle-linear" width={20} height={20} className="me-2" />
-                      Manager Escalation Required
+                <Card className="mb-3 border-danger shadow-sm">
+                  <Card.Header className="bg-danger bg-opacity-10 border-danger">
+                    <h6 className="mb-0 text-danger d-flex align-items-center gap-2">
+                      <IconifyIcon icon="solar:danger-circle-bold" width={20} height={20} />
+                      Manager Callback Required
                     </h6>
                   </Card.Header>
                   <Card.Body>
                     <Row className="g-3">
                       {selectedComplaint.escalation.callback_timeline && (
                         <Col md={6}>
-                          <small className="text-muted d-block">Callback Timeline</small>
+                          <small className="text-muted d-block mb-1">Callback Timeline</small>
                           <strong>{selectedComplaint.escalation.callback_timeline}</strong>
                         </Col>
                       )}
                       {selectedComplaint.escalation.callback_reasons && selectedComplaint.escalation.callback_reasons.length > 0 && (
                         <Col xs={12}>
-                          <small className="text-muted d-block mb-1">Callback Reasons</small>
+                          <small className="text-muted d-block mb-2">Reasons for Callback</small>
                           <ul className="mb-0">
                             {selectedComplaint.escalation.callback_reasons.map((reason, idx) => (
-                              <li key={idx}>{reason}</li>
+                              <li key={idx}><strong>{reason}</strong></li>
                             ))}
                           </ul>
                         </Col>
@@ -1099,52 +1299,43 @@ const ComplaintsPage = () => {
                 </Card>
               )}
 
-              {/* Status & Metadata Card */}
-              <Card>
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:info-circle-linear" width={20} height={20} className="me-2" />
-                    Status & Metadata
+              {/* Metadata Card */}
+              <Card className="border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:info-circle-bold" width={20} height={20} className="text-primary" />
+                    Timeline
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <Row className="g-3">
-                    <Col md={4}>
-                      <small className="text-muted d-block">Status</small>
-                      <Badge bg={getStatusBadgeColor(selectedComplaint.status)}>
-                        {selectedComplaint.status.replace('_', ' ').toUpperCase()}
-                      </Badge>
-                    </Col>
-                    <Col md={4}>
-                      <small className="text-muted d-block">Created</small>
+                    <Col md={6}>
+                      <small className="text-muted d-block mb-1">Submitted On</small>
                       <strong className="small">{formatDateTime(selectedComplaint.created_at)}</strong>
                     </Col>
-                    <Col md={4}>
-                      <small className="text-muted d-block">Updated</small>
+                    <Col md={6}>
+                      <small className="text-muted d-block mb-1">Last Updated</small>
                       <strong className="small">{formatDateTime(selectedComplaint.updated_at)}</strong>
                     </Col>
-                    {/* <Col xs={12}>
-                      <small className="text-muted d-block">Call Log ID</small>
-                      <code className="small">{selectedComplaint.call_log_id}</code>
-                    </Col> */}
                   </Row>
                 </Card.Body>
               </Card>
 
-              {/* Call Log Link Button - Prominent at Top */}
-              <Card className="mb-3 border-primary">
+              {/* Call Log Link Button */}
+              <Card className="mt-3 border-primary shadow-sm">
                 <Card.Body className="d-flex justify-content-between align-items-center py-3">
                   <div>
-                    <h6 className="mb-1">
-                      <IconifyIcon icon="solar:phone-calling-linear" width={20} height={20} className="me-2" />
-                      Related Call Log
+                    <h6 className="mb-1 d-flex align-items-center gap-2">
+                      <IconifyIcon icon="solar:phone-calling-bold" width={20} height={20} className="text-primary" />
+                      Related Call Recording
                     </h6>
-                    <small className="text-muted">View the original call that generated this complaint</small>
+                    <small className="text-muted">Listen to the original call that generated this complaint</small>
                   </div>
                   <Button
                     variant="primary"
                     onClick={() => handleViewCallLog(selectedComplaint.call_log_id)}
                     disabled={loadingCallLog}
+                    style={{ borderRadius: '8px' }}
                   >
                     {loadingCallLog ? (
                       <>
@@ -1153,8 +1344,8 @@ const ComplaintsPage = () => {
                       </>
                     ) : (
                       <>
-                        <IconifyIcon icon="solar:eye-linear" width={18} height={18} className="me-2" />
-                        View Call Log
+                        <IconifyIcon icon="solar:eye-bold" width={18} height={18} className="me-2" />
+                        View Call Details
                       </>
                     )}
                   </Button>
@@ -1163,8 +1354,8 @@ const ComplaintsPage = () => {
             </>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDetailModal(false)}>
+        <Modal.Footer className="border-0">
+          <Button variant="secondary" onClick={() => setShowDetailModal(false)} style={{ borderRadius: '8px' }}>
             Close
           </Button>
         </Modal.Footer>
@@ -1177,33 +1368,33 @@ const ComplaintsPage = () => {
         size="lg"
         centered
       >
-        <Modal.Header closeButton>
-          <Modal.Title>Call Log Details</Modal.Title>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Call Recording Details</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-3">
           {selectedCallLog && (
             <>
               {/* Caller Info Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:user-linear" width={20} height={20} className="me-2" />
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:user-bold" width={20} height={20} className="text-primary" />
                     Caller Information
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <Row className="g-3">
                     <Col md={4}>
-                      <small className="text-muted d-block">Name</small>
+                      <small className="text-muted d-block mb-1">Name</small>
                       <strong>{selectedCallLog.caller.name}</strong>
                     </Col>
                     <Col md={4}>
-                      <small className="text-muted d-block">Phone</small>
+                      <small className="text-muted d-block mb-1">Phone Number</small>
                       <strong>{selectedCallLog.caller.number}</strong>
                     </Col>
                     <Col md={4}>
-                      <small className="text-muted d-block">Email</small>
-                      <strong>{selectedCallLog.caller.email || '—'}</strong>
+                      <small className="text-muted d-block mb-1">Email</small>
+                      <strong>{selectedCallLog.caller.email || 'Not provided'}</strong>
                     </Col>
                   </Row>
                 </Card.Body>
@@ -1211,10 +1402,10 @@ const ComplaintsPage = () => {
 
               {/* Store Info Card */}
               {(selectedCallLog.store_number || selectedCallLog.store_location) && (
-                <Card className="mb-3">
-                  <Card.Header>
-                    <h6 className="mb-0">
-                      <IconifyIcon icon="solar:shop-linear" width={20} height={20} className="me-2" />
+                <Card className="mb-3 border-0 shadow-sm">
+                  <Card.Header className="bg-light border-0">
+                    <h6 className="mb-0 d-flex align-items-center gap-2">
+                      <IconifyIcon icon="solar:shop-bold" width={20} height={20} className="text-primary" />
                       Store Information
                     </h6>
                   </Card.Header>
@@ -1222,14 +1413,14 @@ const ComplaintsPage = () => {
                     <Row className="g-3">
                       {selectedCallLog.store_number && (
                         <Col md={6}>
-                          <small className="text-muted d-block">Store Number</small>
+                          <small className="text-muted d-block mb-1">Store Number</small>
                           <strong>#{selectedCallLog.store_number}</strong>
                         </Col>
                       )}
                       {selectedCallLog.store_location && (
                         <Col md={6}>
-                          <small className="text-muted d-block">Location</small>
-                          <Badge bg="secondary" className="px-2 py-1">
+                          <small className="text-muted d-block mb-1">Location</small>
+                          <Badge bg="secondary" className="px-3 py-2" style={{ fontSize: '0.875rem' }}>
                             {selectedCallLog.store_location}
                           </Badge>
                         </Col>
@@ -1240,26 +1431,26 @@ const ComplaintsPage = () => {
               )}
 
               {/* Call Details Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:phone-linear" width={20} height={20} className="me-2" />
-                    Call Details
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:phone-bold" width={20} height={20} className="text-primary" />
+                    Call Information
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <Row className="g-3 mb-3">
                     <Col md={6}>
-                      <small className="text-muted d-block">Started At</small>
+                      <small className="text-muted d-block mb-1">Call Started</small>
                       <strong>{formatDateTime(selectedCallLog.call_timing.started_at)}</strong>
                     </Col>
                     <Col md={6}>
-                      <small className="text-muted d-block">Ended At</small>
+                      <small className="text-muted d-block mb-1">Call Ended</small>
                       <strong>{formatDateTime(selectedCallLog.call_timing.ended_at)}</strong>
                     </Col>
                     <Col md={4}>
-                      <small className="text-muted d-block">Duration</small>
-                      <Badge bg="info">
+                      <small className="text-muted d-block mb-1">Duration</small>
+                      <Badge bg="info" style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
                         {calculateDuration(
                           selectedCallLog.call_timing.started_at,
                           selectedCallLog.call_timing.ended_at
@@ -1267,64 +1458,54 @@ const ComplaintsPage = () => {
                       </Badge>
                     </Col>
                     <Col md={4}>
-                      <small className="text-muted d-block">Status</small>
-                      <Badge bg={selectedCallLog.call_success ? 'success' : 'danger'}>
-                        {selectedCallLog.call_success ? 'Success' : 'Failed'}
+                      <small className="text-muted d-block mb-1">Call Status</small>
+                      <Badge bg={selectedCallLog.call_success ? 'success' : 'danger'} style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
+                        {selectedCallLog.call_success ? 'Successful' : 'Failed'}
                       </Badge>
                     </Col>
                     <Col md={4}>
-                      <small className="text-muted d-block">Read Status</small>
-                      <Badge bg={selectedCallLog.view_status ? 'success' : 'warning'}>
+                      <small className="text-muted d-block mb-1">Read Status</small>
+                      <Badge bg={selectedCallLog.view_status ? 'success' : 'warning'} style={{ fontSize: '0.875rem', padding: '0.5rem 1rem' }}>
                         {selectedCallLog.view_status ? 'Read' : 'Unread'}
                       </Badge>
                     </Col>
                   </Row>
-                  {/* <Row className="g-3">
-                    <Col xs={12}>
-                      <small className="text-muted d-block">Conversation ID</small>
-                      <code className="small">{selectedCallLog.conversation_id}</code>
-                    </Col>
-                    <Col xs={12}>
-                      <small className="text-muted d-block">Agent ID</small>
-                      <code className="small">{selectedCallLog.agent_id}</code>
-                    </Col>
-                  </Row> */}
                 </Card.Body>
               </Card>
 
               {/* Summaries Card */}
-              <Card className="mb-3">
-                <Card.Header>
-                  <h6 className="mb-0">
-                    <IconifyIcon icon="solar:document-text-linear" width={20} height={20} className="me-2" />
+              <Card className="mb-3 border-0 shadow-sm">
+                <Card.Header className="bg-light border-0">
+                  <h6 className="mb-0 d-flex align-items-center gap-2">
+                    <IconifyIcon icon="solar:document-text-bold" width={20} height={20} className="text-primary" />
                     Call Summary
                   </h6>
                 </Card.Header>
                 <Card.Body>
                   <div className="mb-3">
-                    <small className="text-muted d-block mb-1">Brief Summary</small>
-                    <p className="mb-0">{selectedCallLog.summaries.brief}</p>
+                    <small className="text-muted d-block mb-2">Brief Summary</small>
+                    <p className="mb-0 p-3 bg-light rounded">{selectedCallLog.summaries.brief}</p>
                   </div>
                   <div>
-                    <small className="text-muted d-block mb-1">Detailed Summary</small>
-                    <p className="mb-0">{selectedCallLog.summaries.detailed}</p>
+                    <small className="text-muted d-block mb-2">Detailed Summary</small>
+                    <p className="mb-0 p-3 bg-light rounded">{selectedCallLog.summaries.detailed}</p>
                   </div>
                 </Card.Body>
               </Card>
 
               {/* Questions Asked Card */}
               {selectedCallLog?.questions_asked && selectedCallLog.questions_asked.length > 0 && (
-                <Card className="mb-3">
-                  <Card.Header>
-                    <h6 className="mb-0">
-                      <IconifyIcon icon="solar:chat-round-line-linear" width={20} height={20} className="me-2" />
+                <Card className="mb-3 border-0 shadow-sm">
+                  <Card.Header className="bg-light border-0">
+                    <h6 className="mb-0 d-flex align-items-center gap-2">
+                      <IconifyIcon icon="solar:chat-round-line-bold" width={20} height={20} className="text-primary" />
                       Questions Asked During Call
                     </h6>
                   </Card.Header>
                   <Card.Body>
                     <ul className="mb-0">
                       {selectedCallLog.questions_asked.map((question, idx) => (
-                        <li key={idx}>{question}</li>
+                        <li key={idx} className="mb-2"><strong>{question}</strong></li>
                       ))}
                     </ul>
                   </Card.Body>
@@ -1333,13 +1514,13 @@ const ComplaintsPage = () => {
 
               {/* Action Flag */}
               {selectedCallLog.action_flag && (
-                <Card className="border-danger mb-3">
+                <Card className="mb-3 border-danger shadow-sm">
                   <Card.Body>
-                    <div className="d-flex align-items-center gap-2">
-                      <IconifyIcon icon="solar:danger-circle-linear" width={24} height={24} className="text-danger" />
+                    <div className="d-flex align-items-center gap-3">
+                      <IconifyIcon icon="solar:danger-circle-bold" width={28} height={28} className="text-danger" />
                       <div>
-                        <strong className="text-danger">Action Required</strong>
-                        <p className="mb-0 small text-muted">This call requires follow-up action</p>
+                        <strong className="text-danger d-block mb-1">Action Required</strong>
+                        <p className="mb-0 small text-muted">This call requires immediate follow-up attention</p>
                       </div>
                     </div>
                   </Card.Body>
@@ -1348,10 +1529,10 @@ const ComplaintsPage = () => {
 
               {/* Recording Player */}
               {selectedCallLog.recording_link && (
-                <Card>
-                  <Card.Header>
-                    <h6 className="mb-0">
-                      <IconifyIcon icon="solar:music-library-2-linear" width={20} height={20} className="me-2" />
+                <Card className="border-0 shadow-sm">
+                  <Card.Header className="bg-light border-0">
+                    <h6 className="mb-0 d-flex align-items-center gap-2">
+                      <IconifyIcon icon="solar:music-library-2-bold" width={20} height={20} className="text-primary" />
                       Call Recording
                     </h6>
                   </Card.Header>
@@ -1361,13 +1542,14 @@ const ComplaintsPage = () => {
                         controls
                         className="w-100"
                         src={selectedCallLog.recording_link}
-                        onError={() => setAudioError('Failed to load audio')}
+                        onError={() => setAudioError('Unable to load audio file')}
+                        style={{ borderRadius: '8px' }}
                       >
-                        Your browser does not support the audio element.
+                        Your browser does not support audio playback.
                       </audio>
                       {audioError && (
-                        <div className="alert alert-danger mt-2 mb-0">
-                          <small>{audioError}</small>
+                        <div className="alert alert-danger mt-3 mb-0">
+                          <small><strong>Error:</strong> {audioError}</small>
                         </div>
                       )}
                     </div>
@@ -1377,19 +1559,21 @@ const ComplaintsPage = () => {
             </>
           )}
         </Modal.Body>
-        <Modal.Footer>
+        <Modal.Footer className="border-0">
           <Button
             variant="secondary"
             onClick={() => setShowCallLogModal(false)}
+            style={{ borderRadius: '8px' }}
           >
             Close
           </Button>
           <Button
             variant="primary"
             onClick={() => handleNavigateToCallLog(selectedCallLog!.id)}
+            style={{ borderRadius: '8px' }}
           >
-            <IconifyIcon icon="solar:arrow-right-linear" width={18} height={18} className="me-2" />
-            Go to Call Records Page
+            <IconifyIcon icon="solar:arrow-right-bold" width={18} height={18} className="me-2" />
+            Go to Call Records
           </Button>
         </Modal.Footer>
       </Modal>
@@ -1400,6 +1584,5 @@ const ComplaintsPage = () => {
 }
 
 export default ComplaintsPage
-
 
 export const dynamic = 'force-dynamic'

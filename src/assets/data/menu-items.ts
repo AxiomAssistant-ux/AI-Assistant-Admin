@@ -131,11 +131,11 @@ export const PLATFORM_MENU_ITEMS: MenuItemType[] = [
    ===================================================== */
 
 export const ORG_MENU_ITEMS: MenuItemType[] = [
-  // {
-  //   key: 'menu',
-  //   label: 'MENU',
-  //   isTitle: true,
-  // },
+  {
+    key: 'menu',
+    label: 'OPERATIONS',
+    isTitle: true,
+  },
   {
     key: 'org-dashboard',
     label: 'Dashboard',
@@ -149,21 +149,8 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
   //   url: '/agent',
   // },
   {
-    key: 'users-roles',
-    label: 'User Management',
-    icon: 'solar:users-group-rounded-outline',
-    url: '/users-roles',
-  },
-  {
-    key: 'action-items',
-    label: 'Action Items',
-    icon: 'solar:checklist-outline',
-    url: '/action-items',
-    // badge: { variant: 'danger', text: '3' },
-  },
-  {
     key: 'call-records',
-    label: 'Call Records',
+    label: 'Calls',
     icon: 'solar:call-chat-outline',
     url: '/call-records',
     // badge: { variant: 'warning', text: '0' }, // Will be updated dynamically
@@ -173,6 +160,44 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     label: 'Complaints',
     icon: 'solar:danger-triangle-linear',
     url: '/complaints',
+    // Badge shows ONLY pending count - will be updated dynamically
+    // badge: { variant: 'danger', text: '0' },
+    children: [
+      // Pending with badge
+      {
+        key: 'nav_complaints__all',
+        label: 'All',
+        url: '/complaints',
+        // badge: { variant: 'danger', text: '0' } // Updated dynamically
+      },
+      // Pending with badge
+      {
+        key: 'nav_complaints__pending',
+        label: 'Pending',
+        url: '/complaints?status=pending',
+        // badge: { variant: 'danger', text: '0' } // Updated dynamically
+      },
+      // In Progress with badge
+      {
+        key: 'nav_complaints__in_progress',
+        label: 'In Progress',
+        url: '/complaints?status=in_progress',
+        // badge: { variant: 'warning', text: '0' } // Updated dynamically
+      },
+      // Resolved - NO badge
+      {
+        key: 'nav_complaints__resolved',
+        label: 'Resolved',
+        url: '/complaints?status=resolved'
+      },
+    ]
+  },
+  {
+    key: 'action-items',
+    label: 'Tasks',
+    icon: 'solar:checklist-outline',
+    url: '/action-items',
+    // badge: { variant: 'danger', text: '3' },
   },
   {
     key: 'orders',
@@ -193,6 +218,17 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
     url: '/appointments',
   },
   {
+    key: 'menu',
+    label: 'MANAGEMENT',
+    isTitle: true,
+  },
+  {
+    key: 'users-roles',
+    label: 'Team',
+    icon: 'solar:users-group-rounded-outline',
+    url: '/users-roles',
+  },
+  {
     key: 'locations',
     label: 'Locations',
     icon: 'solar:map-outline',
@@ -211,8 +247,13 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
   //   url: '/agent-settings',
   // },
   {
+    key: 'menu',
+    label: 'BILLING & SUPPORT',
+    isTitle: true,
+  },
+  {
     key: 'usage-billing',
-    label: 'Usage and Billings',
+    label: 'Billing & Usage',
     icon: 'solar:chart-outline',
     url: '/usage',
   },
@@ -225,7 +266,7 @@ export const ORG_MENU_ITEMS: MenuItemType[] = [
 
   {
     key: 'contact-support',
-    label: 'Contact Support',
+    label: 'Support',
     icon: 'solar:phone-calling-outline',
     url: '/contact-support',
   },

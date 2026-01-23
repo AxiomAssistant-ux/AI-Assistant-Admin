@@ -1,8 +1,7 @@
-// src/app/(dashboard)/locations/page.tsx
 'use client'
 
 import React, { useEffect, useState, useCallback, useMemo } from 'react'
-import { Row, Col, Button, Badge, Modal, Form, Alert, Table, Spinner, Nav } from 'react-bootstrap'
+import { Row, Col, Button, Badge, Modal, Form, Alert, Table, Spinner, Nav, Card } from 'react-bootstrap'
 import Link from 'next/link'
 import IconifyIcon from '@/components/wrapper/IconifyIcon'
 import Footer from '@/components/layout/Footer'
@@ -123,7 +122,7 @@ const LocationsPage = () => {
     e.preventDefault()
     
     if (!formData.store_location.trim()) {
-      toast.error('Location is required')
+      toast.error('Store address is required')
       return
     }
     
@@ -132,10 +131,10 @@ const LocationsPage = () => {
     try {
       if (editingLocation) {
         await locationsApi.update(editingLocation.id, formData)
-        toast.success('Location updated successfully')
+        toast.success('Store location updated successfully')
       } else {
         await locationsApi.create(formData)
-        toast.success('Location created successfully')
+        toast.success('Store location added successfully')
       }
       
       handleCloseModal()
@@ -149,11 +148,11 @@ const LocationsPage = () => {
   }
 
   const handleDelete = useCallback(async (locationId: string) => {
-    if (!confirm('Are you sure you want to delete this location?')) return
+    if (!confirm('Are you sure you want to delete this store location? This cannot be undone.')) return
     
     try {
       await locationsApi.delete(locationId)
-      toast.success('Location deleted successfully')
+      toast.success('Store location removed successfully')
       fetchLocations()
     } catch (err: any) {
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to delete location'
@@ -180,7 +179,7 @@ const LocationsPage = () => {
       ]
       
       if (!validTypes.includes(file.type)) {
-        toast.error('Unsupported file type. Please upload PDF, CSV, DOCX, or TXT file.')
+        toast.error('Unsupported file type. Please upload PDF, CSV, Word, or TXT file.')
         return
       }
       
@@ -203,7 +202,7 @@ const LocationsPage = () => {
       } else if (importMode === 'text' && pastedText.trim()) {
         result = await locationsApi.parseText(pastedText)
       } else {
-        toast.error('Please provide file or text to parse')
+        toast.error('Please provide file or text to import')
         setParsing(false)
         return
       }
@@ -213,13 +212,13 @@ const LocationsPage = () => {
         // Select all by default
         setSelectedLocations(new Set(result.locations.map((_, idx) => idx)))
         setParseStatus('success')
-        toast.success(`Successfully extracted ${result.total_extracted} locations`)
+        toast.success(`Found ${result.total_extracted} store locations`)
       } else {
-        setParseError(result.error_message || 'No locations found')
+        setParseError(result.error_message || 'No store locations found in the file')
         setParseStatus('failed')
       }
     } catch (err: any) {
-      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to parse'
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to read file'
       setParseError(errorMsg)
       setParseStatus('failed')
       toast.error(errorMsg)
@@ -270,9 +269,9 @@ const LocationsPage = () => {
       const result = await locationsApi.bulkCreate({ locations: locationsToSave })
       
       if (result.errors.length > 0) {
-        toast.warning(`Saved ${result.success_count} locations with ${result.errors.length} errors`)
+        toast.warning(`Saved ${result.success_count} locations (${result.errors.length} duplicates skipped)`)
       } else {
-        toast.success(`Successfully saved ${result.success_count} locations`)
+        toast.success(`Successfully saved ${result.success_count} store locations`)
       }
       
       // Close modal and refresh
@@ -308,6 +307,14 @@ const LocationsPage = () => {
     setParseStatus(null)
   }
 
+  const formatDateTime = (dateString: string): string => {
+    return new Date(dateString).toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    })
+  }
+
   // Table columns
   const columns: DataTableColumn<Location>[] = useMemo(
     () => [
@@ -317,69 +324,78 @@ const LocationsPage = () => {
         width: 60,
         align: 'left',
         render: (_, { rowIndex }) => (
-          <span className="text-muted">{startIndex + rowIndex + 1}</span>
+          <span className="text-muted fw-semibold">{startIndex + rowIndex + 1}</span>
         )
       },
       {
         key: 'store_number',
-        header: 'Store Number',
-        minWidth: 120,
+        header: 'Store #',
+        width: 140,
         render: (location) => (
           location.store_number ? (
-            <Badge bg="primary">{location.store_number}</Badge>
+            <div className="d-flex align-items-center gap-2">
+              <div
+                className="rounded-circle d-flex align-items-center justify-content-center"
+                style={{
+                  width: 32,
+                  height: 32,
+                  background: '#E3F2FD',
+                  color: '#1976D2'
+                }}
+              >
+                <IconifyIcon icon="solar:shop-bold" width={16} height={16} />
+              </div>
+              <Badge bg="primary" style={{ fontSize: '0.85rem', padding: '0.4rem 0.75rem', fontWeight: 600 }}>
+                {location.store_number}
+              </Badge>
+            </div>
           ) : (
-            <span className="text-muted fst-italic">—</span>
+            <span className="text-muted fst-italic">Not set</span>
           )
         )
       },
       {
         key: 'store_location',
-        header: 'Location',
-        minWidth: 300,
+        header: 'Store Address',
+        minWidth: 350,
         render: (location) => (
-          <div className="text-truncate" style={{ maxWidth: '400px' }} title={location.store_location}>
-            {location.store_location}
+          <div>
+            <div className="fw-semibold mb-1" style={{ fontSize: '0.95rem' }}>
+              {location.store_location}
+            </div>
+            <small className="text-muted d-flex align-items-center gap-1">
+              <IconifyIcon icon="solar:calendar-linear" width={14} height={14} />
+              Added {formatDateTime(location.created_at)}
+            </small>
           </div>
-        )
-      },
-      {
-        key: 'created_at',
-        header: 'Created',
-        minWidth: 150,
-        render: (location) => (
-          <small className="text-muted">
-            {new Date(location.created_at).toLocaleDateString('en-US', {
-              year: 'numeric',
-              month: 'short',
-              day: 'numeric'
-            })}
-          </small>
         )
       },
       {
         key: 'actions',
         header: 'Actions',
-        width: 150,
-        align: 'center',
+        width: 130,
+        align: 'left',
         sticky: 'right',
         defaultSticky: true,
         render: (location) => (
-          <div className="d-flex gap-2 justify-content-left">
+          <div className="d-flex gap-2">
             <Button
-              variant="outline-primary"
+              variant="primary"
               size="sm"
               onClick={() => handleOpenEditModal(location)}
-              title="Edit location"
+              title="Edit store details"
+              style={{ borderRadius: '8px' }}
             >
-              <IconifyIcon icon="solar:pen-linear" width={16} height={16} />
+              <IconifyIcon icon="solar:pen-bold" width={16} height={16} />
             </Button>
             <Button
-              variant="outline-danger"
+              variant="danger"
               size="sm"
               onClick={() => handleDelete(location.id)}
-              title="Delete location"
+              title="Remove store"
+              style={{ borderRadius: '8px' }}
             >
-              <IconifyIcon icon="solar:trash-bin-trash-linear" width={16} height={16} />
+              <IconifyIcon icon="solar:trash-bin-trash-bold" width={16} height={16} />
             </Button>
           </div>
         )
@@ -393,9 +409,11 @@ const LocationsPage = () => {
       <Row>
         <Col xs={12}>
           <div className="text-center py-5">
-            <p>Please sign in to manage locations.</p>
+            <IconifyIcon icon="solar:lock-password-linear" width={64} height={64} className="text-muted mb-3" />
+            <h4 className="mb-3">Authentication Required</h4>
+            <p className="text-muted mb-4">Please sign in to manage store locations.</p>
             <Link href="/auth/sign-in">
-              <Button variant="primary">Sign In</Button>
+              <Button variant="primary" size="lg">Sign In</Button>
             </Link>
           </div>
         </Col>
@@ -421,25 +439,25 @@ const LocationsPage = () => {
               </ol>
             </div>
             <div className="d-flex gap-2">
-              <Button variant="outline-primary" onClick={handleOpenImportModal}>
-                <IconifyIcon icon="solar:upload-linear" width={18} height={18} className="me-2" />
-                Import Locations
+              <Button variant="outline-primary" onClick={handleOpenImportModal} style={{ borderRadius: '8px' }}>
+                <IconifyIcon icon="solar:upload-bold" width={18} height={18} className="me-2" />
+                Import from File
               </Button>
-              <Button variant="primary" onClick={handleOpenCreateModal}>
-                <IconifyIcon icon="solar:add-circle-linear" width={18} height={18} className="me-2" />
-                Add Location
+              <Button variant="primary" onClick={handleOpenCreateModal} style={{ borderRadius: '8px' }}>
+                <IconifyIcon icon="solar:add-circle-bold" width={18} height={18} className="me-2" />
+                Add Store
               </Button>
             </div>
           </div>
         </Col>
       </Row>
 
-      <Row className="">
+      <Row>
         <Col xs={12}>
           <DataTable
             id="locations-table"
-            title="Store Locations"
-            description="Manage your organization's store locations for call filtering"
+            title="Your Store Locations"
+            description="Manage all your store locations - these help organize customer calls by location"
             columns={columns}
             data={locations}
             rowKey={(location) => location.id}
@@ -449,7 +467,7 @@ const LocationsPage = () => {
             toolbar={{
               search: {
                 value: searchQuery,
-                placeholder: 'Search by store number or location...',
+                placeholder: 'Search by store number or address...',
                 onChange: setSearchQuery,
                 onClear: () => setSearchQuery('')
               }
@@ -466,63 +484,75 @@ const LocationsPage = () => {
               endRecord: Math.min(startIndex + pageSize, total)
             }}
             emptyState={{
-              title: 'No Locations Found',
+              title: 'No Store Locations Yet',
               description: debouncedSearch
-                ? 'Try adjusting your search criteria.'
-                : 'Add your first location to get started.'
+                ? 'No stores match your search. Try different keywords.'
+                : 'Add your first store location to get started. You can add them one by one or import from a file.'
             }}
-            columnPanel={{ enableColumnVisibility: true, enableSticky: true, maxSticky: 3 }}
+            columnPanel={{ enableColumnVisibility: true, enableSticky: true, maxSticky: 2 }}
           />
         </Col>
       </Row>
 
       {/* Create/Edit Modal */}
       <Modal show={showModal} onHide={handleCloseModal} centered>
-        <Modal.Header closeButton>
-          <Modal.Title>{editingLocation ? 'Edit Location' : 'Add Location'}</Modal.Title>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">
+            {editingLocation ? 'Edit Store Location' : 'Add New Store'}
+          </Modal.Title>
         </Modal.Header>
         <Form onSubmit={handleSubmitForm}>
-          <Modal.Body>
+          <Modal.Body className="pt-3">
             <Form.Group className="mb-3">
               <Form.Label>Store Number (Optional)</Form.Label>
               <Form.Control
                 type="text"
-                placeholder="e.g., 123, STORE-456"
+                placeholder="e.g., 101, Store-A, Main Branch"
                 value={formData.store_number}
                 onChange={(e) => setFormData({ ...formData, store_number: e.target.value })}
+                style={{ borderRadius: '8px' }}
               />
               <Form.Text className="text-muted">
-                Unique identifier for this store location
+                A unique identifier for this store (like a store code or number)
               </Form.Text>
             </Form.Group>
             
             <Form.Group className="mb-3">
-              <Form.Label>Store Location <span className="text-danger">*</span></Form.Label>
+              <Form.Label>Store Address <span className="text-danger">*</span></Form.Label>
               <Form.Control
                 as="textarea"
                 rows={3}
-                placeholder="e.g., 123 Main St, Springfield, IL 62701"
+                placeholder="e.g., 123 Main Street, Springfield, IL 62701"
                 value={formData.store_location}
                 onChange={(e) => setFormData({ ...formData, store_location: e.target.value })}
                 required
+                style={{ borderRadius: '8px' }}
               />
               <Form.Text className="text-muted">
-                Full address or location description
+                The full street address or location description
               </Form.Text>
             </Form.Group>
           </Modal.Body>
-          <Modal.Footer>
-            <Button variant="secondary" onClick={handleCloseModal} disabled={formSubmitting}>
+          <Modal.Footer className="border-0">
+            <Button variant="secondary" onClick={handleCloseModal} disabled={formSubmitting} style={{ borderRadius: '8px' }}>
               Cancel
             </Button>
-            <Button variant="primary" type="submit" disabled={formSubmitting}>
+            <Button variant="primary" type="submit" disabled={formSubmitting} style={{ borderRadius: '8px' }}>
               {formSubmitting ? (
                 <>
                   <Spinner animation="border" size="sm" className="me-2" />
                   Saving...
                 </>
               ) : (
-                editingLocation ? 'Update Location' : 'Create Location'
+                <>
+                  <IconifyIcon 
+                    icon={editingLocation ? 'solar:check-circle-bold' : 'solar:add-circle-bold'} 
+                    width={18} 
+                    height={18} 
+                    className="me-2" 
+                  />
+                  {editingLocation ? 'Update Store' : 'Add Store'}
+                </>
               )}
             </Button>
           </Modal.Footer>
@@ -531,120 +561,152 @@ const LocationsPage = () => {
 
       {/* Import Modal */}
       <Modal show={showImportModal} onHide={handleCloseImportModal} size="xl" centered scrollable>
-        <Modal.Header closeButton>
-          <Modal.Title>Import Locations</Modal.Title>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold">Import Store Locations</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
+        <Modal.Body className="pt-3">
           {parsedLocations.length === 0 ? (
             <>
-              <Alert variant="info">
+              <Alert variant="info" className="border-0" style={{ background: '#E3F2FD', borderRadius: '8px' }}>
                 <Alert.Heading className="d-flex align-items-center">
-                  <IconifyIcon icon="solar:info-circle-linear" width={20} height={20} className="me-2" />
-                  Import Instructions
+                  <IconifyIcon icon="solar:info-circle-bold" width={24} height={24} className="me-2" style={{ color: '#1976D2' }} />
+                  <span style={{ color: '#1565C0' }}>How This Works</span>
                 </Alert.Heading>
-                <ul className="mb-0">
-                  <li>Upload a file or paste text containing store locations</li>
-                  <li><strong>Supported formats:</strong> PDF, CSV, DOCX, TXT</li>
-                  <li><strong>Maximum file size:</strong> 5MB (50 pages for PDF)</li>
-                  <li>AI will extract store numbers and addresses automatically</li>
-                  <li>You will review and edit before saving</li>
-                  <li>Duplicate store numbers will be rejected</li>
+                <ul className="mb-0" style={{ color: '#0D47A1' }}>
+                  <li>Upload a file containing your store locations (PDF, Excel, Word, or text file)</li>
+                  <li>Or simply copy and paste a list of stores from anywhere</li>
+                  <li><strong>Our AI will automatically find:</strong> Store numbers and addresses</li>
+                  <li>You'll get a chance to review and edit everything before saving</li>
+                  <li><strong>File size limit:</strong> 5MB (around 50 pages for PDFs)</li>
                 </ul>
               </Alert>
               
               {/* Tab selection */}
-              <Nav variant="tabs" className="mb-3">
+              <Nav variant="tabs" className="mb-4">
                 <Nav.Item>
                   <Nav.Link 
                     active={importMode === 'file'} 
                     onClick={() => setImportMode('file')}
-                    style={{ cursor: 'pointer' }}
+                    style={{ 
+                      cursor: 'pointer',
+                      borderRadius: '8px 8px 0 0',
+                      fontWeight: importMode === 'file' ? 600 : 400
+                    }}
                   >
-                    <IconifyIcon icon="solar:document-linear" width={16} height={16} className="me-2" />
-                    Upload File
+                    <IconifyIcon icon="solar:document-add-bold" width={18} height={18} className="me-2" />
+                    Upload a File
                   </Nav.Link>
                 </Nav.Item>
                 <Nav.Item>
                   <Nav.Link 
                     active={importMode === 'text'} 
                     onClick={() => setImportMode('text')}
-                    style={{ cursor: 'pointer' }}
+                    style={{ 
+                      cursor: 'pointer',
+                      borderRadius: '8px 8px 0 0',
+                      fontWeight: importMode === 'text' ? 600 : 400
+                    }}
                   >
-                    <IconifyIcon icon="solar:text-linear" width={16} height={16} className="me-2" />
-                    Paste Text
+                    <IconifyIcon icon="solar:clipboard-text-bold" width={18} height={18} className="me-2" />
+                    Copy & Paste
                   </Nav.Link>
                 </Nav.Item>
               </Nav>
               
               {importMode === 'file' ? (
                 <Form.Group>
-                  <Form.Label>Select File (PDF, CSV, DOCX, TXT)</Form.Label>
+                  <Form.Label className="fw-semibold">Choose Your File</Form.Label>
                   <Form.Control
                     type="file"
-                    accept=".pdf,.csv,.docx,.txt"
+                    accept=".pdf,.csv,.docx,.txt,.xlsx"
                     onChange={handleFileSelect}
                     disabled={parsing}
+                    style={{ borderRadius: '8px' }}
                   />
+                  <Form.Text className="text-muted">
+                    Accepted formats: PDF, Excel (.xlsx, .csv), Word (.docx), or Text (.txt)
+                  </Form.Text>
+                  
                   {selectedFile && (
-                    <div className="mt-3 p-3 bg-light rounded d-flex align-items-center gap-2">
-                      <IconifyIcon 
-                        icon={
-                          selectedFile.type === 'application/pdf' ? 'solar:document-linear' :
-                          selectedFile.type === 'text/csv' ? 'solar:file-text-linear' :
-                          selectedFile.type === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ? 'solar:file-text-linear' :
-                          'solar:document-linear'
-                        } 
-                        width={24} 
-                        height={24} 
-                      />
-                      <div className="flex-grow-1">
-                        <strong>{selectedFile.name}</strong>
-                        <div className="small text-muted">
-                          {(selectedFile.size / 1024).toFixed(2)} KB
+                    <Card className="mt-3 border-0 shadow-sm">
+                      <Card.Body className="d-flex align-items-center gap-3">
+                        <div
+                          className="rounded d-flex align-items-center justify-content-center"
+                          style={{
+                            width: 48,
+                            height: 48,
+                            background: '#E8F5E9',
+                            color: '#2E7D32'
+                          }}
+                        >
+                          <IconifyIcon 
+                            icon={
+                              selectedFile.type === 'application/pdf' ? 'solar:document-bold' :
+                              selectedFile.type.includes('spreadsheet') || selectedFile.type === 'text/csv' ? 'solar:chart-square-bold' :
+                              selectedFile.type.includes('word') ? 'solar:document-text-bold' :
+                              'solar:file-bold'
+                            } 
+                            width={28} 
+                            height={28} 
+                          />
                         </div>
-                      </div>
-                      <Button
-                        variant="link"
-                        size="sm"
-                        className="text-danger p-0"
-                        onClick={() => setSelectedFile(null)}
-                        title="Remove file"
-                      >
-                        <IconifyIcon icon="solar:close-circle-linear" width={20} height={20} />
-                      </Button>
-                    </div>
+                        <div className="flex-grow-1">
+                          <div className="fw-semibold" style={{ fontSize: '0.95rem' }}>{selectedFile.name}</div>
+                          <small className="text-muted">
+                            {(selectedFile.size / 1024).toFixed(1)} KB
+                          </small>
+                        </div>
+                        <Button
+                          variant="link"
+                          size="sm"
+                          className="text-danger p-0"
+                          onClick={() => setSelectedFile(null)}
+                          title="Remove file"
+                        >
+                          <IconifyIcon icon="solar:close-circle-bold" width={24} height={24} />
+                        </Button>
+                      </Card.Body>
+                    </Card>
                   )}
                 </Form.Group>
               ) : (
                 <Form.Group>
-                  <Form.Label>Paste Location Data</Form.Label>
+                  <Form.Label className="fw-semibold">Paste Your Store List</Form.Label>
                   <Form.Control
                     as="textarea"
                     rows={12}
-                    placeholder={`Paste your location data here...
+                    placeholder={`Paste your store locations here - any format works!
 
-Example formats:
-- Store #123 - Springfield, 123 Main St, IL 62701
-- Store #456 - Chicago, 456 Oak Ave, IL 60601
+Examples that work great:
 
-- 123, Springfield Main Branch, 123 Main St
-- 456, Chicago Oak, 456 Oak Ave
+Store #101 - Downtown Branch
+123 Main Street, Springfield, IL 62701
 
-CSV format also works:
-store_number,store_location
-123,"Springfield, 123 Main St"
-456,"Chicago, 456 Oak Ave"`}
+Store #102 - West Side Location  
+456 Oak Avenue, Chicago, IL 60601
+
+Or even simple lists like:
+101, Springfield Downtown, 123 Main St
+102, Chicago West, 456 Oak Ave
+
+The AI will figure it out automatically!`}
                     value={pastedText}
                     onChange={(e) => setPastedText(e.target.value)}
                     disabled={parsing}
+                    style={{ 
+                      borderRadius: '8px',
+                      fontFamily: 'monospace',
+                      fontSize: '0.9rem'
+                    }}
                   />
                   <Form.Text className="text-muted">
-                    Paste location data in any format - the AI will parse it automatically
+                    Don't worry about formatting - our AI will extract the store information automatically
                   </Form.Text>
                   {pastedText && (
                     <div className="mt-2">
-                      <Badge bg="secondary">
-                        {pastedText.split('\n').filter(line => line.trim()).length} lines
+                      <Badge bg="secondary" style={{ fontSize: '0.8rem', padding: '0.4rem 0.75rem' }}>
+                        <IconifyIcon icon="solar:text-bold" width={14} height={14} className="me-1" />
+                        {pastedText.split('\n').filter(line => line.trim()).length} lines of text
                       </Badge>
                     </div>
                   )}
@@ -652,40 +714,59 @@ store_number,store_location
               )}
               
               {parseError && (
-                <Alert variant="danger" className="mt-3">
-                  <IconifyIcon icon="solar:danger-circle-linear" width={20} height={20} className="me-2" />
-                  {parseError}
+                <Alert variant="danger" className="mt-3 border-0" style={{ borderRadius: '8px' }}>
+                  <div className="d-flex align-items-start gap-2">
+                    <IconifyIcon icon="solar:danger-circle-bold" width={24} height={24} style={{ marginTop: 2 }} />
+                    <div>
+                      <strong>Couldn't Find Locations</strong>
+                      <div className="mt-1">{parseError}</div>
+                      <div className="mt-2 small">
+                        <strong>Tips:</strong>
+                        <ul className="mb-0 mt-1">
+                          <li>Make sure your file contains store numbers or addresses</li>
+                          <li>Try a different file format (PDF works best)</li>
+                          <li>If copy-pasting, ensure each store is on a new line</li>
+                        </ul>
+                      </div>
+                    </div>
+                  </div>
                 </Alert>
               )}
             </>
           ) : (
             <>
-              <Alert variant="success">
+              <Alert variant="success" className="border-0" style={{ background: '#E8F5E9', borderRadius: '8px' }}>
                 <Alert.Heading className="d-flex align-items-center">
-                  <IconifyIcon icon="solar:check-circle-linear" width={20} height={20} className="me-2" />
-                  Extracted {parsedLocations.length} Locations
+                  <IconifyIcon icon="solar:check-circle-bold" width={24} height={24} className="me-2" style={{ color: '#2E7D32' }} />
+                  <span style={{ color: '#1B5E20' }}>Found {parsedLocations.length} Store Locations!</span>
                 </Alert.Heading>
-                <p className="mb-0">
-                  Review the extracted data below. You can edit entries or deselect items before saving.
+                <p className="mb-0" style={{ color: '#2E7D32' }}>
+                  Review the stores below. You can edit any details or uncheck stores you don't want to import.
                 </p>
               </Alert>
               
-              <div className="mb-3 d-flex justify-content-between align-items-center">
+              <div className="mb-3 d-flex justify-content-between align-items-center p-3 bg-light rounded" style={{ borderRadius: '8px' }}>
                 <div>
-                  <strong>{selectedLocations.size}</strong> of {parsedLocations.length} selected
+                  <strong style={{ fontSize: '1.1rem', color: '#1976D2' }}>{selectedLocations.size}</strong>
+                  <span className="text-muted"> of {parsedLocations.length} stores selected</span>
                 </div>
-                <Button variant="outline-primary" size="sm" onClick={handleToggleAll}>
-                  {selectedLocations.size === parsedLocations.length ? 'Deselect All' : 'Select All'}
+                <Button variant="outline-primary" size="sm" onClick={handleToggleAll} style={{ borderRadius: '8px' }}>
+                  <IconifyIcon 
+                    icon={selectedLocations.size === parsedLocations.length ? 'solar:close-square-bold' : 'solar:check-square-bold'} 
+                    width={16} 
+                    height={16} 
+                    className="me-2" 
+                  />
+                  {selectedLocations.size === parsedLocations.length ? 'Uncheck All' : 'Check All'}
                 </Button>
               </div>
               
-              <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
-                <Table striped bordered hover size="sm">
-                  <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1 }}>
+              <div style={{ maxHeight: '400px', overflowY: 'auto', borderRadius: '8px', border: '1px solid #e0e0e0' }}>
+                <Table striped hover size="sm" className="mb-0">
+                  <thead style={{ position: 'sticky', top: 0, background: 'white', zIndex: 1, boxShadow: '0 2px 4px rgba(0,0,0,0.1)' }}>
                     <tr>
-                      <th style={{ width: '50px' }}></th>
-                      <th style={{ width: '150px' }}>Store Number</th>
-                      <th>Location</th>
+                      <th style={{ width: '150px' }}>Store #</th>
+                      <th>Store Address</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -706,6 +787,7 @@ store_number,store_location
                             onChange={(e) => handleEditParsedLocation(idx, 'store_number', e.target.value)}
                             placeholder="Optional"
                             disabled={!selectedLocations.has(idx)}
+                            style={{ borderRadius: '6px' }}
                           />
                         </td>
                         <td>
@@ -716,6 +798,7 @@ store_number,store_location
                             value={location.store_location}
                             onChange={(e) => handleEditParsedLocation(idx, 'store_location', e.target.value)}
                             disabled={!selectedLocations.has(idx)}
+                            style={{ borderRadius: '6px' }}
                           />
                         </td>
                       </tr>
@@ -726,8 +809,8 @@ store_number,store_location
             </>
           )}
         </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={handleCloseImportModal} disabled={parsing || bulkSaving}>
+        <Modal.Footer className="border-0">
+          <Button variant="secondary" onClick={handleCloseImportModal} disabled={parsing || bulkSaving} style={{ borderRadius: '8px' }}>
             Cancel
           </Button>
           
@@ -740,16 +823,17 @@ store_number,store_location
                 (importMode === 'file' && !selectedFile) ||
                 (importMode === 'text' && !pastedText?.trim())
               }
+              style={{ borderRadius: '8px' }}
             >
               {parsing ? (
                 <>
                   <Spinner animation="border" size="sm" className="me-2" />
-                  Parsing...
+                  Reading file...
                 </>
               ) : (
                 <>
-                  <IconifyIcon icon="solar:magic-stick-3-linear" width={18} height={18} className="me-2" />
-                  Parse Locations
+                  <IconifyIcon icon="solar:magic-stick-3-bold" width={18} height={18} className="me-2" />
+                  Find Stores
                 </>
               )}
             </Button>
@@ -758,16 +842,17 @@ store_number,store_location
               variant="success"
               onClick={handleSaveLocations}
               disabled={selectedLocations.size === 0 || bulkSaving}
+              style={{ borderRadius: '8px' }}
             >
               {bulkSaving ? (
                 <>
                   <Spinner animation="border" size="sm" className="me-2" />
-                  Saving...
+                  Saving stores...
                 </>
               ) : (
                 <>
-                  <IconifyIcon icon="solar:download-minimalistic-linear" width={18} height={18} className="me-2" />
-                  Save {selectedLocations.size} Locations
+                  <IconifyIcon icon="solar:download-minimalistic-bold" width={18} height={18} className="me-2" />
+                  Save {selectedLocations.size} {selectedLocations.size === 1 ? 'Store' : 'Stores'}
                 </>
               )}
             </Button>
@@ -781,6 +866,5 @@ store_number,store_location
 }
 
 export default LocationsPage
-
 
 export const dynamic = 'force-dynamic'

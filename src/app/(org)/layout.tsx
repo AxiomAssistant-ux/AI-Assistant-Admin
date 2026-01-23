@@ -7,6 +7,8 @@ import { Container } from 'react-bootstrap'
 import AuthGuard from '@/lib/auth-guard'
 import { VerticalDebug } from '@/components/VerticalDebug'
 
+import GlobalRealtimeListener from '@/components/GlobalRealtimeListener'
+
 const TopNavigationBar = dynamic(() => import('@/components/layout/TopNavigationBar/page'))
 const VerticalNavigationBar = dynamic(() => import('@/components/layout/VerticalNavigationBar/page'))
 
@@ -23,6 +25,7 @@ const AdminLayout = ({ children }: ChildrenType) => {
           <Container fluid>
             {children}
             {/* <VerticalDebug /> */}
+            <GlobalRealtimeListener />            
           </Container>
           <Footer />
         </div>

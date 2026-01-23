@@ -67,10 +67,11 @@ $yellow: #f4c006;
 $green: #17c553;
 $teal: #040505;
 $cyan: #63b7e6;
+$custom: #e4af00;
 // scss-docs-end color-variables
 
 // scss-docs-start theme-color-variables
-$primary: $blue;
+$primary: $custom;
 $secondary: $gray-600;
 $blue: $blue;
 $indigo: $indigo;

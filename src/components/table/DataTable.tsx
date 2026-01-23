@@ -45,6 +45,8 @@ function DataTable<T>({
   emptyState,
   columnPanel,
   rowKey,
+  rowClassName,
+  rowStyle,
   sorting,
   stickyHeader = true,
   minTableWidth = DEFAULT_MIN_WIDTH,
@@ -625,11 +627,11 @@ function DataTable<T>({
             style={
               stickyHeader
                 ? {
-                    position: 'sticky',
-                    top: 0,
-                    zIndex: 101,
-                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
-                  }
+                  position: 'sticky',
+                  top: 0,
+                  zIndex: 101,
+                  boxShadow: '0 2px 4px rgba(0,0,0,0.1)'
+                }
                 : undefined
             }
           >
@@ -637,7 +639,7 @@ function DataTable<T>({
           </thead>
           <tbody>
             {data.map((row, rowIndex) => (
-              <tr key={rowKey ? rowKey(row, rowIndex) : `${id}-${rowIndex}`}>
+              <tr key={rowKey ? rowKey(row, rowIndex) : `${id}-${rowIndex}`} className={rowClassName?.(row, rowIndex)} style={rowStyle?.(row, rowIndex)} >
                 {visibleColumns.map((column) => renderBodyCell(row, rowIndex, column))}
               </tr>
             ))}

@@ -46,6 +46,7 @@
     "sass": "^1.81.0",
     "simplebar-core": "^1.2.6",
     "simplebar-react": "^3.2.6",
+    "socket.io-client": "^4.8.3",
     "swiper": "^11.1.15",
     "yup": "^1.4.0"
   },

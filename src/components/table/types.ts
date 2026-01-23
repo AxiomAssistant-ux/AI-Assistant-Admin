@@ -140,5 +140,8 @@ export type DataTableProps<T> = {
     onReset?: () => void
   }
   tableContainerStyle?: CSSProperties
+  rowClassName?: (row: T, rowIndex: number) => string
+  rowStyle?: (row: T, rowIndex: number) => CSSProperties | undefined
+
 }
 
