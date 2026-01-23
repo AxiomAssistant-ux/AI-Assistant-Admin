@@ -576,7 +576,7 @@ const LocationsPage = () => {
                   <li>Upload a file containing your store locations (PDF, Excel, Word, or text file)</li>
                   <li>Or simply copy and paste a list of stores from anywhere</li>
                   <li><strong>Our AI will automatically find:</strong> Store numbers and addresses</li>
-                  <li>You'll get a chance to review and edit everything before saving</li>
+                  <li>You will get a chance to review and edit everything before saving</li>
                   <li><strong>File size limit:</strong> 5MB (around 50 pages for PDFs)</li>
                 </ul>
               </Alert>
@@ -700,7 +700,7 @@ The AI will figure it out automatically!`}
                     }}
                   />
                   <Form.Text className="text-muted">
-                    Don't worry about formatting - our AI will extract the store information automatically
+                    Do not worry about formatting - our AI will extract the store information automatically
                   </Form.Text>
                   {pastedText && (
                     <div className="mt-2">
@@ -718,7 +718,7 @@ The AI will figure it out automatically!`}
                   <div className="d-flex align-items-start gap-2">
                     <IconifyIcon icon="solar:danger-circle-bold" width={24} height={24} style={{ marginTop: 2 }} />
                     <div>
-                      <strong>Couldn't Find Locations</strong>
+                      <strong>Could not Find Locations</strong>
                       <div className="mt-1">{parseError}</div>
                       <div className="mt-2 small">
                         <strong>Tips:</strong>
@@ -741,7 +741,7 @@ The AI will figure it out automatically!`}
                   <span style={{ color: '#1B5E20' }}>Found {parsedLocations.length} Store Locations!</span>
                 </Alert.Heading>
                 <p className="mb-0" style={{ color: '#2E7D32' }}>
-                  Review the stores below. You can edit any details or uncheck stores you don't want to import.
+                  Review the stores below. You can edit any details or uncheck stores you do not want to import.
                 </p>
               </Alert>
               

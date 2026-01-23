@@ -888,7 +888,7 @@ const ActionItemsPage = () => {
         )
       }
     ],
-    [updatingField, updatingStatusId, startIndex, handleStatusChange, handleConfirmAppointment, handleConfirmOrder, handleUrgencyToggle, orgUsers]
+    [updatingField, updatingStatusId, startIndex, handleStatusChange, handleConfirmAppointment, handleConfirmOrder, handleUrgencyToggle, orgUsers, getUserName]
   )
 
   return (
