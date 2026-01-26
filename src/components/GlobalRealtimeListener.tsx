@@ -10,7 +10,7 @@ export default function GlobalRealtimeListener() {
   const handleCallLogCreated = useCallback((data: any) => {
     const notificationKey = `call_${data.conversation_id || data.id}`
 
-    // ✅ prevent duplicate toasts
+    // ✅ Prevent duplicate toasts
     if (shownNotifications.current.has(notificationKey)) return
     shownNotifications.current.add(notificationKey)
 
@@ -18,7 +18,7 @@ export default function GlobalRealtimeListener() {
       shownNotifications.current.delete(notificationKey)
     }, 30000)
 
-    // ✅ show toast globally
+    // ✅ Show toast globally
     toast.success(
       <div>
         <strong>New Call Received</strong>
@@ -40,14 +40,13 @@ export default function GlobalRealtimeListener() {
       }
     )
 
-    // ✅ refresh call logs everywhere
+    // ✅ Trigger refresh events
     window.dispatchEvent(
       new CustomEvent('call_logs_refresh', {
         detail: { reason: 'call_log_created', data }
       })
     )
 
-    // ✅ refresh unread count everywhere
     window.dispatchEvent(
       new CustomEvent('unread_count_refresh', {
         detail: { reason: 'call_log_created', data }
@@ -59,31 +58,48 @@ export default function GlobalRealtimeListener() {
   const handleActiveCallsUpdated = useCallback((data: any) => {
     console.log('📞 Global: Active calls updated:', data)
 
-    // ✅ trigger update for badge hook
+    // ✅ FIX #8: Dispatch event with data for useActiveCalls hook
     window.dispatchEvent(
       new CustomEvent('active_calls_updated', {
         detail: data
       })
     )
 
-    // optional toast
-    if (data.count > 0) {
-      toast.info(
-        `${data.count} active call${data.count > 1 ? 's' : ''} in progress`,
-        {
-          position: 'top-right',
-          autoClose: 2000,
-          hideProgressBar: true,
-        }
-      )
+    // ✅ FIX #9: Only show toast when count changes significantly
+    // Don't spam toasts for every update
+    const lastCount = parseInt(sessionStorage.getItem('last_active_calls_count') || '0')
+    const currentCount = data.count || 0
+
+    if (currentCount !== lastCount) {
+      sessionStorage.setItem('last_active_calls_count', currentCount.toString())
+      
+      // Only show toast if there's a meaningful change
+      if (currentCount > lastCount) {
+        toast.info(
+          `${currentCount} active call${currentCount > 1 ? 's' : ''} in progress`,
+          {
+            position: 'top-right',
+            autoClose: 2000,
+            hideProgressBar: true,
+            toastId: 'active_calls_update' // Prevent duplicates
+          }
+        )
+      }
     }
   }, [])
 
+  // ✅ FIX #10: Single Socket.IO connection for entire app
   useSocketIO({
     onCallLogCreated: handleCallLogCreated,
     onActiveCallsUpdated: handleActiveCallsUpdated,
-    onConnect: () => console.log('✅ Global Socket.IO connected'),
-    onDisconnect: () => console.log('❌ Global Socket.IO disconnected'),
+    onConnect: () => {
+      console.log('✅ Global Socket.IO connected')
+      // Reset active calls count on reconnect
+      sessionStorage.removeItem('last_active_calls_count')
+    },
+    onDisconnect: () => {
+      console.log('❌ Global Socket.IO disconnected')
+    },
   })
 
   return null

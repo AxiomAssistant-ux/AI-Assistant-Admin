@@ -14,15 +14,13 @@ import { useFeatureGuard } from '@/hooks/useFeatureGuard'
 
 const LocationsPage = () => {
   useFeatureGuard()
-  const { token, isAuthenticated } = useAuth()
+  const { token, isAuthenticated, user } = useAuth()
   
-  // Location management state
   const [locations, setLocations] = useState<Location[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [total, setTotal] = useState(0)
   
-  // Search and pagination
   const [searchQuery, setSearchQuery] = useState('')
   const [debouncedSearch, setDebouncedSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
@@ -44,12 +42,27 @@ const LocationsPage = () => {
   const [pastedText, setPastedText] = useState('')
   const [parsedLocations, setParsedLocations] = useState<ParsedLocation[]>([])
   const [parsing, setParsing] = useState(false)
-  const [parseStatus, setParseStatus] = useState<string | null>(null)
   const [parseError, setParseError] = useState<string | null>(null)
   const [selectedLocations, setSelectedLocations] = useState<Set<number>>(new Set())
   const [bulkSaving, setBulkSaving] = useState(false)
 
-  // Debounce search
+  // Mobile account modal
+  const [showMobileModal, setShowMobileModal] = useState(false)
+  const [mobileLocation, setMobileLocation] = useState<Location | null>(null)
+  const [mobileEmail, setMobileEmail] = useState('')
+  const [enablingMobile, setEnablingMobile] = useState(false)
+
+  const isAdmin = Boolean(user && 'is_admin' in user && user.is_admin)
+  
+  // Get admin's email domain for suggestion
+  const adminEmailDomain = useMemo(() => {
+    if (user && 'email' in user && user.email) {
+      const match = user.email.match(/@(.+)/)
+      return match ? match[1] : 'example.com'
+    }
+    return 'example.com'
+  }, [user])
+
   useEffect(() => {
     const timer = setTimeout(() => {
       setDebouncedSearch(searchQuery.trim())
@@ -58,7 +71,6 @@ const LocationsPage = () => {
     return () => clearTimeout(timer)
   }, [searchQuery])
 
-  // Fetch locations
   const fetchLocations = useCallback(async () => {
     if (!token || !isAuthenticated) return
     
@@ -148,7 +160,7 @@ const LocationsPage = () => {
   }
 
   const handleDelete = useCallback(async (locationId: string) => {
-    if (!confirm('Are you sure you want to delete this store location? This cannot be undone.')) return
+    if (!confirm('Are you sure you want to delete this store location? This will also remove any associated mobile account.')) return
     
     try {
       await locationsApi.delete(locationId)
@@ -158,19 +170,77 @@ const LocationsPage = () => {
       const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to delete location'
       toast.error(errorMsg)
     }
-  },[fetchLocations])
+  }, [fetchLocations])
 
-  // Import handlers
+  // Mobile account handlers
+  const handleOpenMobileModal = (location: Location) => {
+    setMobileLocation(location)
+    // Auto-generate email suggestion
+    const suggestedEmail = location.store_number 
+      ? `${location.store_number}@${adminEmailDomain}`
+      : `store@${adminEmailDomain}`
+    setMobileEmail(suggestedEmail)
+    setShowMobileModal(true)
+  }
+
+  const handleCloseMobileModal = () => {
+    setShowMobileModal(false)
+    setMobileLocation(null)
+    setMobileEmail('')
+  }
+
+  const handleEnableMobileAccount = async () => {
+    if (!mobileLocation) return
+    
+    if (!mobileEmail.trim()) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+    
+    // Basic email validation
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+    if (!emailRegex.test(mobileEmail)) {
+      toast.error('Please enter a valid email address')
+      return
+    }
+    
+    setEnablingMobile(true)
+    
+    try {
+      await locationsApi.enableMobileAccount(mobileLocation.id, mobileEmail)
+      toast.success('Mobile account enabled! Invitation email sent to the store.')
+      handleCloseMobileModal()
+      fetchLocations()
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to enable mobile account'
+      toast.error(errorMsg)
+    } finally {
+      setEnablingMobile(false)
+    }
+  }
+
+  const handleDisableMobileAccount = async (locationId: string) => {
+    if (!confirm('Are you sure you want to disable the mobile account for this store? The store will lose access to the mobile app.')) return
+    
+    try {
+      await locationsApi.disableMobileAccount(locationId)
+      toast.success('Mobile account disabled successfully')
+      fetchLocations()
+    } catch (err: any) {
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to disable mobile account'
+      toast.error(errorMsg)
+    }
+  }
+
+  // Import handlers (unchanged from original)
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (file) {
-      // Validate file size
       if (file.size > 5 * 1024 * 1024) {
         toast.error('File must be less than 5MB')
         return
       }
       
-      // Validate file type
       const validTypes = [
         'application/pdf',
         'text/csv',
@@ -209,18 +279,14 @@ const LocationsPage = () => {
       
       if (result.parse_status === 'success' && result.locations.length > 0) {
         setParsedLocations(result.locations)
-        // Select all by default
         setSelectedLocations(new Set(result.locations.map((_, idx) => idx)))
-        setParseStatus('success')
         toast.success(`Found ${result.total_extracted} store locations`)
       } else {
-        setParseError(result.error_message || 'No store locations found in the file')
-        setParseStatus('failed')
+        setParseError(result.error_message || 'No store locations found')
       }
     } catch (err: any) {
-      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to read file'
+      const errorMsg = err?.response?.data?.detail || err?.message || 'Failed to parse'
       setParseError(errorMsg)
-      setParseStatus('failed')
       toast.error(errorMsg)
     } finally {
       setParsing(false)
@@ -274,7 +340,6 @@ const LocationsPage = () => {
         toast.success(`Successfully saved ${result.success_count} store locations`)
       }
       
-      // Close modal and refresh
       handleCloseImportModal()
       fetchLocations()
     } catch (err: any) {
@@ -293,18 +358,10 @@ const LocationsPage = () => {
     setParsedLocations([])
     setSelectedLocations(new Set())
     setParseError(null)
-    setParseStatus(null)
   }
 
   const handleOpenImportModal = () => {
     setShowImportModal(true)
-    setImportMode('file')
-    setSelectedFile(null)
-    setPastedText('')
-    setParsedLocations([])
-    setSelectedLocations(new Set())
-    setParseError(null)
-    setParseStatus(null)
   }
 
   const formatDateTime = (dateString: string): string => {
@@ -357,7 +414,7 @@ const LocationsPage = () => {
       {
         key: 'store_location',
         header: 'Store Address',
-        minWidth: 350,
+        minWidth: 300,
         render: (location) => (
           <div>
             <div className="fw-semibold mb-1" style={{ fontSize: '0.95rem' }}>
@@ -371,14 +428,60 @@ const LocationsPage = () => {
         )
       },
       {
+        key: 'mobile_account',
+        header: 'Mobile App',
+        width: 160,
+        render: (location) => (
+          <div>
+            {location.mobile_account_enabled ? (
+              <div>
+                <Badge bg="success" className="d-flex align-items-center gap-1 mb-1" style={{ width: 'fit-content' }}>
+                  <IconifyIcon icon="solar:check-circle-bold" width={14} height={14} />
+                  Enabled
+                </Badge>
+                <small className="text-muted d-block">{location.mobile_account_email}</small>
+              </div>
+            ) : (
+              <Badge bg="secondary" className="d-flex align-items-center gap-1" style={{ width: 'fit-content' }}>
+                <IconifyIcon icon="solar:lock-password-linear" width={14} height={14} />
+                Not Enabled
+              </Badge>
+            )}
+          </div>
+        )
+      },
+      {
         key: 'actions',
         header: 'Actions',
-        width: 130,
+        width: 200,
         align: 'left',
         sticky: 'right',
         defaultSticky: true,
         render: (location) => (
           <div className="d-flex gap-2">
+            {!location.mobile_account_enabled ? (
+              <Button
+                variant="success"
+                size="sm"
+                onClick={() => handleOpenMobileModal(location)}
+                title="Enable mobile app access"
+                style={{ borderRadius: '8px' }}
+                disabled={!isAdmin}
+              >
+                <IconifyIcon icon="solar:smartphone-2-bold" width={16} height={16} />
+              </Button>
+            ) : (
+              <Button
+                variant="warning"
+                size="sm"
+                onClick={() => handleDisableMobileAccount(location.id)}
+                title="Disable mobile app access"
+                style={{ borderRadius: '8px' }}
+                disabled={!isAdmin}
+              >
+                <IconifyIcon icon="solar:lock-password-bold" width={16} height={16} />
+              </Button>
+            )}
             <Button
               variant="primary"
               size="sm"
@@ -394,6 +497,7 @@ const LocationsPage = () => {
               onClick={() => handleDelete(location.id)}
               title="Remove store"
               style={{ borderRadius: '8px' }}
+              disabled={!isAdmin}
             >
               <IconifyIcon icon="solar:trash-bin-trash-bold" width={16} height={16} />
             </Button>
@@ -401,7 +505,7 @@ const LocationsPage = () => {
         )
       }
     ],
-    [startIndex, handleDelete]
+    [startIndex, isAdmin, handleDelete, adminEmailDomain]
   )
 
   if (!isAuthenticated) {
@@ -457,7 +561,7 @@ const LocationsPage = () => {
           <DataTable
             id="locations-table"
             title="Your Store Locations"
-            description="Manage all your store locations - these help organize customer calls by location"
+            description="Manage store locations and mobile app access for store teams"
             columns={columns}
             data={locations}
             rowKey={(location) => location.id}
@@ -487,14 +591,89 @@ const LocationsPage = () => {
               title: 'No Store Locations Yet',
               description: debouncedSearch
                 ? 'No stores match your search. Try different keywords.'
-                : 'Add your first store location to get started. You can add them one by one or import from a file.'
+                : 'Add your first store location to get started.'
             }}
             columnPanel={{ enableColumnVisibility: true, enableSticky: true, maxSticky: 2 }}
           />
         </Col>
       </Row>
 
-      {/* Create/Edit Modal */}
+      {/* Mobile Account Modal */}
+      <Modal show={showMobileModal} onHide={handleCloseMobileModal} centered>
+        <Modal.Header closeButton className="border-0 pb-0">
+          <Modal.Title className="fw-bold d-flex align-items-center gap-2">
+            <IconifyIcon icon="solar:smartphone-2-bold" width={24} height={24} />
+            Enable Mobile App Access
+          </Modal.Title>
+        </Modal.Header>
+        <Modal.Body className="pt-3">
+          {mobileLocation && (
+            <>
+              <Alert variant="info" className="border-0 mb-3" style={{ background: '#E3F2FD', borderRadius: '8px' }}>
+                <div className="d-flex align-items-start gap-2">
+                  <IconifyIcon icon="solar:info-circle-bold" width={20} height={20} style={{ color: '#1976D2', marginTop: 2 }} />
+                  <div style={{ color: '#0D47A1', fontSize: '0.9rem' }}>
+                    <strong>What happens next:</strong>
+                    <ul className="mb-0 mt-2" style={{ paddingLeft: '20px' }}>
+                      <li>An invitation will be sent to the store email</li>
+                      <li>Store staff can set their password and access the mobile app</li>
+                      <li>They can manage complaints, tasks, orders, and view analytics</li>
+                    </ul>
+                  </div>
+                </div>
+              </Alert>
+
+              <div className="mb-3 p-3 bg-light rounded">
+                <div className="fw-semibold mb-1">Store Details</div>
+                <div className="text-muted small">
+                  {mobileLocation.store_number && <div>Store #{mobileLocation.store_number}</div>}
+                  <div>{mobileLocation.store_location}</div>
+                </div>
+              </div>
+
+              <Form.Group className="mb-3">
+                <Form.Label>Store Email Address <span className="text-danger">*</span></Form.Label>
+                <Form.Control
+                  type="email"
+                  placeholder="store@example.com"
+                  value={mobileEmail}
+                  onChange={(e) => setMobileEmail(e.target.value)}
+                  disabled={enablingMobile}
+                  style={{ borderRadius: '8px' }}
+                />
+                <Form.Text className="text-muted">
+                  This email will be used for the store's mobile app login
+                </Form.Text>
+              </Form.Group>
+            </>
+          )}
+        </Modal.Body>
+        <Modal.Footer className="border-0">
+          <Button variant="secondary" onClick={handleCloseMobileModal} disabled={enablingMobile} style={{ borderRadius: '8px' }}>
+            Cancel
+          </Button>
+          <Button 
+            variant="success" 
+            onClick={handleEnableMobileAccount} 
+            disabled={enablingMobile}
+            style={{ borderRadius: '8px' }}
+          >
+            {enablingMobile ? (
+              <>
+                <Spinner animation="border" size="sm" className="me-2" />
+                Enabling...
+              </>
+            ) : (
+              <>
+                <IconifyIcon icon="solar:check-circle-bold" width={18} height={18} className="me-2" />
+                Enable & Send Invitation
+              </>
+            )}
+          </Button>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Create/Edit Modal (unchanged) */}
       <Modal show={showModal} onHide={handleCloseModal} centered>
         <Modal.Header closeButton className="border-0 pb-0">
           <Modal.Title className="fw-bold">
@@ -513,7 +692,7 @@ const LocationsPage = () => {
                 style={{ borderRadius: '8px' }}
               />
               <Form.Text className="text-muted">
-                A unique identifier for this store (like a store code or number)
+                A unique identifier for this store
               </Form.Text>
             </Form.Group>
             

@@ -39,14 +39,21 @@ export function useSocketIO(options: UseSocketIOOptions = {}) {
   const socketRef = useRef<Socket | null>(null)
   const reconnectAttempts = useRef(0)
   const maxReconnectAttempts = 5
+  const mountedRef = useRef(true)  // ✅ Track if component is mounted
 
-  // Store options in ref to avoid re-running effects
+  // ✅ FIX #6: Stable options reference to prevent reconnections
   const optionsRef = useRef(options)
   useEffect(() => {
     optionsRef.current = options
   }, [options])
 
   const connect = useCallback(() => {
+    // ✅ Prevent connection if already connected or unmounted
+    if (!mountedRef.current) {
+      console.log('[Socket.IO] Component unmounted, skipping connection')
+      return
+    }
+
     if (socketRef.current?.connected) {
       console.log('[Socket.IO] Already connected, skipping')
       return
@@ -60,17 +67,13 @@ export function useSocketIO(options: UseSocketIOOptions = {}) {
       }
 
       const baseUrl = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:8000'
-      
-      // Remove /api/v1 if present
       const socketUrl = baseUrl.replace('/api/v1', '')
 
       console.log('[Socket.IO] Connecting to:', socketUrl)
 
       const socket = io(socketUrl, {
-        auth: {
-          token
-        },
-        transports: ['websocket', 'polling'], // Try WebSocket first, fallback to polling
+        auth: { token },
+        transports: ['websocket', 'polling'],
         reconnection: true,
         reconnectionDelay: 1000,
         reconnectionDelayMax: 5000,
@@ -78,22 +81,34 @@ export function useSocketIO(options: UseSocketIOOptions = {}) {
         timeout: 20000
       })
 
-      // Connection events
+      // ✅ Connection events
       socket.on('connect', () => {
+        if (!mountedRef.current) return
+        
         console.log('[Socket.IO] Connected successfully', socket.id)
         setIsConnected(true)
         setError(null)
         reconnectAttempts.current = 0
         optionsRef.current.onConnect?.()
+        
+        // ✅ Dispatch global event for status tracking
+        window.dispatchEvent(new Event('realtime_connected'))
       })
 
       socket.on('disconnect', (reason) => {
+        if (!mountedRef.current) return
+        
         console.log('[Socket.IO] Disconnected:', reason)
         setIsConnected(false)
         optionsRef.current.onDisconnect?.()
+        
+        // ✅ Dispatch global event for status tracking
+        window.dispatchEvent(new Event('realtime_disconnected'))
       })
 
       socket.on('connect_error', (err) => {
+        if (!mountedRef.current) return
+        
         console.error('[Socket.IO] Connection error:', err.message)
         setError(`Connection error: ${err.message}`)
         reconnectAttempts.current++
@@ -104,67 +119,63 @@ export function useSocketIO(options: UseSocketIOOptions = {}) {
         }
       })
 
-      // Application events
+      // ✅ Application events - removed duplicate logging
       socket.on('connected', (data) => {
-        console.log('[Socket.IO] Server confirmed connection:', data)
+        console.log('[Socket.IO] Server confirmed connection')
       })
 
       socket.on('call_log_created', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Call log created:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onCallLogCreated?.(message.data)
       })
 
       socket.on('complaint_created', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Complaint created:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onComplaintCreated?.(message.data)
       })
 
       socket.on('complaint_updated', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Complaint updated:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onComplaintUpdated?.(message.data)
       })
 
       socket.on('appointment_created', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Appointment created:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onAppointmentCreated?.(message.data)
       })
 
       socket.on('appointment_updated', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Appointment updated:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onAppointmentUpdated?.(message.data)
       })
 
       socket.on('order_created', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Order created:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onOrderCreated?.(message.data)
       })
 
       socket.on('order_updated', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Order updated:', message.data)
+        if (!mountedRef.current) return
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onOrderUpdated?.(message.data)
       })
 
+      // ✅ FIX #7: Active calls handler without window event (handled in global listener)
       socket.on('active_calls_updated', (message: RealtimeMessage) => {
-        console.log('[Socket.IO] Active calls updated:', message.data)
+        if (!mountedRef.current) return
+        console.log('[Socket.IO] Active calls update:', message.data)
         optionsRef.current.onMessage?.(message)
         optionsRef.current.onActiveCallsUpdated?.(message.data)
-        
-        // Dispatch custom event for useActiveCalls hook
-        window.dispatchEvent(new CustomEvent('active_calls_updated', { 
-          detail: message.data 
-        }))
       })
 
-      // Heartbeat/ping
-      socket.on('pong', (data) => {
-        // Heartbeat received
+      socket.on('pong', () => {
+        // Silent heartbeat acknowledgment
       })
 
       socketRef.current = socket
@@ -182,6 +193,7 @@ export function useSocketIO(options: UseSocketIOOptions = {}) {
     }
     reconnectAttempts.current = 0
     setIsConnected(false)
+    window.dispatchEvent(new Event('realtime_disconnected'))
   }, [])
 
   const sendPing = useCallback(() => {
@@ -190,22 +202,24 @@ export function useSocketIO(options: UseSocketIOOptions = {}) {
     }
   }, [])
 
-  // Auto-connect on mount
+  // ✅ Auto-connect on mount
   useEffect(() => {
+    mountedRef.current = true
     connect()
 
     return () => {
+      mountedRef.current = false
       disconnect()
     }
   }, [connect, disconnect])
 
-  // Heartbeat interval
+  // ✅ Heartbeat interval
   useEffect(() => {
     if (!isConnected) return
 
     const interval = setInterval(() => {
       sendPing()
-    }, 30000) // 30 seconds
+    }, 30000)
 
     return () => clearInterval(interval)
   }, [isConnected, sendPing])

@@ -1,6 +1,5 @@
 // src/hooks/useActiveCalls.ts
-import { useEffect, useState, useCallback } from 'react'
-// import { useRealtimeUpdates } from './useRealtimeUpdates'
+import { useEffect, useState } from 'react'
 
 export interface ActiveCall {
   call_sid: string
@@ -16,21 +15,13 @@ export interface ActiveCallsData {
 }
 
 /**
- * Hook to track active calls in real-time
+ * ✅ FIXED: Hook to track active calls in real-time
  * 
- * IMPORTANT: This hook does NOT create its own WebSocket connection.
- * It relies on the parent component having useRealtimeUpdates() with
- * onActiveCallsUpdated callback.
+ * This hook listens to custom events dispatched by GlobalRealtimeListener
+ * and updates the active calls state accordingly.
  * 
  * Usage:
  * ```tsx
- * // In parent component:
- * useRealtimeUpdates({
- *   onActiveCallsUpdated: (data) => console.log(data),
- *   // ... other callbacks
- * })
- * 
- * // In child component:
  * const { activeCallsCount, activeCalls } = useActiveCalls()
  * ```
  */
@@ -40,17 +31,25 @@ export function useActiveCalls() {
     calls: []
   })
 
-  // Listen for custom events dispatched by the shared WebSocket
   useEffect(() => {
-    const handleUpdate = (event: CustomEvent<ActiveCallsData>) => {
-      console.log('📞 Active calls badge received update:', event.detail)
-      setActiveCallsData(event.detail)
+    // ✅ FIX #11: Properly typed event handler
+    const handleUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<ActiveCallsData>
+      console.log('📞 useActiveCalls: Received update:', customEvent.detail)
+      
+      // ✅ Validate data structure before updating state
+      if (customEvent.detail && typeof customEvent.detail.count === 'number') {
+        setActiveCallsData({
+          count: customEvent.detail.count,
+          calls: customEvent.detail.calls || []
+        })
+      }
     }
 
-    window.addEventListener('active_calls_updated' as any, handleUpdate)
+    window.addEventListener('active_calls_updated', handleUpdate)
     
     return () => {
-      window.removeEventListener('active_calls_updated' as any, handleUpdate)
+      window.removeEventListener('active_calls_updated', handleUpdate)
     }
   }, [])
 

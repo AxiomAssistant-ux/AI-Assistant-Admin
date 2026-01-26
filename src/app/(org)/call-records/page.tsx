@@ -580,65 +580,65 @@ const CallRecordsPage = () => {
           </div>
         )
       },
-      {
-        key: 'success',
-        header: 'Call Outcome',
-        width: 120,
-        align: 'left',
-        render: (call) => (
-          <Badge
-            bg={call.call_success ? 'success' : 'danger'}
-            className="d-flex align-items-center gap-1 justify-content-center"
-            style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem', fontWeight: 600 }}
-          >
-            <IconifyIcon
-              icon={call.call_success ? 'solar:check-circle-bold' : 'solar:close-circle-bold'}
-              width={14}
-              height={14}
-            />
-            {call.call_success ? 'Completed' : 'Incomplete'}
-          </Badge>
-        )
-      },
-      {
-        key: 'view_status',
-        header: 'Read Status',
-        width: 140,
-        align: 'left',
-        sticky: 'right',
-        defaultSticky: true,
-        render: (call) => (
-          <Form.Check
-            type="switch"
-            id={`read-toggle-${call.id}`}
-            checked={call.view_status}
-            label={
-              <span className="fw-semibold">
-                {call.view_status ? 'Read' : 'Unread'}
-              </span>
-            }
-            onChange={async (e) => {
-              const checked = e.target.checked
+      // {
+      //   key: 'success',
+      //   header: 'Call Outcome',
+      //   width: 120,
+      //   align: 'left',
+      //   render: (call) => (
+      //     <Badge
+      //       bg={call.call_success ? 'success' : 'danger'}
+      //       className="d-flex align-items-center gap-1 justify-content-center"
+      //       style={{ fontSize: '0.75rem', padding: '0.5rem 0.75rem', fontWeight: 600 }}
+      //     >
+      //       <IconifyIcon
+      //         icon={call.call_success ? 'solar:check-circle-bold' : 'solar:close-circle-bold'}
+      //         width={14}
+      //         height={14}
+      //       />
+      //       {call.call_success ? 'Completed' : 'Incomplete'}
+      //     </Badge>
+      //   )
+      // },
+      // {
+      //   key: 'view_status',
+      //   header: 'Read Status',
+      //   width: 140,
+      //   align: 'left',
+      //   sticky: 'right',
+      //   defaultSticky: true,
+      //   render: (call) => (
+      //     <Form.Check
+      //       type="switch"
+      //       id={`read-toggle-${call.id}`}
+      //       checked={call.view_status}
+      //       label={
+      //         <span className="fw-semibold">
+      //           {call.view_status ? 'Read' : 'Unread'}
+      //         </span>
+      //       }
+      //       onChange={async (e) => {
+      //         const checked = e.target.checked
 
-              try {
-                if (checked) {
-                  await callLogsApi.markAsRead(call.id)
-                }
+      //         try {
+      //           if (checked) {
+      //             await callLogsApi.markAsRead(call.id)
+      //           }
 
-                setCallLogs(prev =>
-                  prev.map(log =>
-                    log.id === call.id ? { ...log, view_status: checked } : log
-                  )
-                )
+      //           setCallLogs(prev =>
+      //             prev.map(log =>
+      //               log.id === call.id ? { ...log, view_status: checked } : log
+      //             )
+      //           )
 
-                fetchUnreadCount()
-              } catch {
-                toast.error('Failed to update read status')
-              }
-            }}
-          />
-        )
-      },
+      //           fetchUnreadCount()
+      //         } catch {
+      //           toast.error('Failed to update read status')
+      //         }
+      //       }}
+      //     />
+      //   )
+      // },
       {
         key: "actions",
         header: "Actions",

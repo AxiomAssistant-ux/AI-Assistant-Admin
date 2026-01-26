@@ -8,6 +8,12 @@ export interface Location {
   org_id: string
   store_number?: string
   store_location: string
+  
+  // Mobile account fields
+  mobile_account_enabled: boolean
+  mobile_account_email?: string
+  mobile_user_id?: string
+  
   created_at: string
   updated_at: string
   created_by?: string
@@ -43,7 +49,7 @@ export interface UpdateLocationRequest {
   store_location?: string
 }
 
-export interface PDFParseResult {
+export interface ParseResult {
   locations: ParsedLocation[]
   total_extracted: number
   parse_status: 'success' | 'partial' | 'failed'
@@ -58,6 +64,15 @@ export interface BulkCreateResponse {
   success_count: number
   total_attempted: number
   errors: string[]
+}
+
+export interface EnableMobileAccountRequest {
+  store_email: string
+}
+
+export interface EnableMobileAccountResponse {
+  message: string
+  location: Location
 }
 
 const getAuthHeaders = () => {
@@ -101,15 +116,25 @@ export const locationsApi = {
     })
   },
 
-  async parsePdf(file: File): Promise<PDFParseResult> {
+  async parseFile(file: File): Promise<ParseResult> {
     const formData = new FormData()
     formData.append('file', file)
     
-    const response = await axios.post(`${API_BASE}/org/locations/parse-pdf`, formData, {
+    const response = await axios.post(`${API_BASE}/org/locations/parse`, formData, {
       headers: {
         ...getAuthHeaders(),
         'Content-Type': 'multipart/form-data'
       }
+    })
+    return response.data
+  },
+  
+  async parseText(text: string): Promise<ParseResult> {
+    const formData = new FormData()
+    formData.append('text', text)
+    
+    const response = await axios.post(`${API_BASE}/org/locations/parse`, formData, {
+      headers: getAuthHeaders()
     })
     return response.data
   },
@@ -128,26 +153,22 @@ export const locationsApi = {
     return response.data
   },
 
-  async parseFile(file: File): Promise<PDFParseResult> {
-    const formData = new FormData()
-    formData.append('file', file)
-    
-    const response = await axios.post(`${API_BASE}/org/locations/parse`, formData, {
-      headers: {
-        ...getAuthHeaders(),
-        'Content-Type': 'multipart/form-data'
-      }
-    })
+  // Mobile account endpoints
+  async enableMobileAccount(locationId: string, storeEmail: string): Promise<EnableMobileAccountResponse> {
+    const response = await axios.post(
+      `${API_BASE}/org/locations/${locationId}/enable-mobile`,
+      { store_email: storeEmail },
+      { headers: getAuthHeaders() }
+    )
     return response.data
   },
-  
-  async parseText(text: string): Promise<PDFParseResult> {
-    const formData = new FormData()
-    formData.append('text', text)
-    
-    const response = await axios.post(`${API_BASE}/org/locations/parse`, formData, {
-      headers: getAuthHeaders()
-    })
+
+  async disableMobileAccount(locationId: string): Promise<{ message: string; location: Location }> {
+    const response = await axios.post(
+      `${API_BASE}/org/locations/${locationId}/disable-mobile`,
+      {},
+      { headers: getAuthHeaders() }
+    )
     return response.data
   }
 }

@@ -410,7 +410,10 @@ const ComplaintsPage = () => {
     fetchComplaints()
   }, [fetchComplaints])
 
-  useRealtimeRefresh(fetchComplaints)
+  // useRealtimeRefresh(fetchComplaints)
+    useRealtimeRefresh(fetchComplaints, ['call_logs_refresh'])
+  
+  
 
   const fetchAndUpdateBadgeCounts = useCallback(async () => {
     if (!token || !isAuthenticated) return
