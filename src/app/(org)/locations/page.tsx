@@ -505,7 +505,7 @@ const LocationsPage = () => {
         )
       }
     ],
-    [startIndex, isAdmin, handleDelete, adminEmailDomain]
+    [startIndex, isAdmin, handleDelete, adminEmailDomain, handleDisableMobileAccount, handleOpenMobileModal]
   )
 
   if (!isAuthenticated) {
@@ -642,7 +642,7 @@ const LocationsPage = () => {
                   style={{ borderRadius: '8px' }}
                 />
                 <Form.Text className="text-muted">
-                  This email will be used for the store's mobile app login
+                  This email will be used for the stores mobile app login
                 </Form.Text>
               </Form.Group>
             </>

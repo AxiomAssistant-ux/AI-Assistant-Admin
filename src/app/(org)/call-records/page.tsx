@@ -710,7 +710,6 @@ const CallRecordsPage = () => {
       playProgress,
       playAudio,
       stopAudio,
-      fetchUnreadCount,
       formatTimeAgo
     ]
   )
