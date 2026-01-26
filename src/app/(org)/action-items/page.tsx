@@ -277,7 +277,8 @@ const ActionItemsPage = () => {
     fetchActionItems()
   }, [fetchActionItems])
 
-  useRealtimeRefresh(fetchActionItems)
+  // useRealtimeRefresh(fetchActionItems)
+  useRealtimeRefresh(fetchActionItems, ['call_logs_refresh'])
 
   const totalPages = Math.max(1, Math.ceil(total / pageSize))
   const startIndex = (currentPage - 1) * pageSize
