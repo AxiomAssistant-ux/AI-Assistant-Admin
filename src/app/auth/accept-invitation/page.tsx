@@ -147,7 +147,9 @@ const AcceptInvitationContent = () => {
   }
 
   return (
-    <div className="d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
+      <div className="account-pages py-5">
+
+    <div className="container d-flex justify-content-center align-items-center" style={{ minHeight: '60vh' }}>
       <Card className="border-0 shadow-lg" style={{ maxWidth: '500px', width: '100%' }}>
         <CardBody className="p-5">
           <div className="text-center mb-4">
@@ -267,6 +269,7 @@ const AcceptInvitationContent = () => {
           </div>
         </CardBody>
       </Card>
+    </div>
     </div>
   )
 }

@@ -1,4 +1,5 @@
 // /api/auth.ts
+// UPDATED VERSION with password reset endpoints
 
 /**
  * Authentication API
@@ -6,7 +7,6 @@
  */
 
 import { apiClient } from './client'
-
 
 export interface TokenExchangeResponse {
   access_token: string
@@ -70,6 +70,33 @@ export interface AcceptInvitationResponse {
   message: string
 }
 
+export interface ForgotPasswordRequest {
+  email: string
+}
+
+export interface ForgotPasswordResponse {
+  message: string
+}
+
+export interface VerifyResetTokenRequest {
+  token: string
+}
+
+export interface VerifyResetTokenResponse {
+  email: string
+  valid: boolean
+}
+
+export interface ResetPasswordRequest {
+  token: string
+  new_password: string
+  confirm_password: string
+}
+
+export interface ResetPasswordResponse {
+  message: string
+}
+
 /**
  * Authentication API endpoints
  */
@@ -91,9 +118,9 @@ export const authApi = {
   },
 
   /**
-  * Exchange Redirect Token
-  * POST /auth/org/token/exchange
-  */
+   * Exchange Redirect Token
+   * POST /auth/org/token/exchange
+   */
   async exchangeRedirectToken(redirectToken: string): Promise<TokenExchangeResponse> {
     return apiClient.post('/auth/org/token/exchange', { redirect_token: redirectToken })
   },
@@ -115,29 +142,30 @@ export const authApi = {
   },
 
   /**
-   * Forgot Password
-   * POST /auth/password/forgot-password
+   * Forgot Password - Request Password Reset
+   * POST /auth/org/forgot-password
    */
-  async forgotPassword(email: string): Promise<{ message: string }> {
-    return apiClient.post('/auth/password/forgot-password', { email })
+  async forgotPassword(email: string): Promise<ForgotPasswordResponse> {
+    return apiClient.post('/auth/org/forgot-password', { email })
   },
 
   /**
    * Verify Reset Token
-   * POST /auth/password/verify-reset-token
+   * POST /auth/org/verify-reset-token
    */
-  async verifyResetToken(token: string): Promise<{ email: string }> {
-    return apiClient.post('/auth/password/verify-reset-token', { token })
+  async verifyResetToken(token: string): Promise<VerifyResetTokenResponse> {
+    return apiClient.post('/auth/org/verify-reset-token', { token })
   },
 
   /**
    * Reset Password
-   * POST /auth/password/reset-password
+   * POST /auth/org/reset-password
    */
-  async resetPassword(token: string, newPassword: string): Promise<{ message: string }> {
-    return apiClient.post('/auth/password/reset-password', {
+  async resetPassword(token: string, newPassword: string, confirmPassword: string): Promise<ResetPasswordResponse> {
+    return apiClient.post('/auth/org/reset-password', {
       token,
       new_password: newPassword,
+      confirm_password: confirmPassword
     })
   },
 
@@ -156,7 +184,4 @@ export const authApi = {
   async acceptInvitation(data: AcceptInvitationRequest): Promise<AcceptInvitationResponse> {
     return apiClient.post('/auth/org/accept-invitation', data)
   },
-
-
-  
 }

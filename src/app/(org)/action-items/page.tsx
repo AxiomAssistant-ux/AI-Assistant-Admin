@@ -849,7 +849,7 @@ const ActionItemsPage = () => {
       },
       {
         key: 'actions',
-        header: 'Actions',
+        header: 'Staff Actions',
         align: 'left',
         sticky: 'right',
         render: (item) => (
@@ -861,7 +861,8 @@ const ActionItemsPage = () => {
               title="View Full Details"
               style={{ borderRadius: '8px' }}
             >
-              <IconifyIcon icon="solar:eye-bold" width={16} height={16} />
+              {/* <IconifyIcon icon="solar:eye-bold" width={16} height={16} /> */}
+              View Details
             </Button>
             {item.type === 'appointment' && item.status !== 'completed' && (
               <Button

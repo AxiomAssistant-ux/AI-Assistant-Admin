@@ -465,10 +465,10 @@ const LocationsPage = () => {
                 size="sm"
                 onClick={() => handleOpenMobileModal(location)}
                 title="Enable mobile app access"
-                style={{ borderRadius: '8px' }}
+                style={{ borderRadius: '8px', width: 120 }}
                 disabled={!isAdmin}
               >
-                <IconifyIcon icon="solar:smartphone-2-bold" width={16} height={16} />
+                <IconifyIcon icon="solar:smartphone-2-bold" width={16} height={16} /> Enable App
               </Button>
             ) : (
               <Button
@@ -476,10 +476,10 @@ const LocationsPage = () => {
                 size="sm"
                 onClick={() => handleDisableMobileAccount(location.id)}
                 title="Disable mobile app access"
-                style={{ borderRadius: '8px' }}
+                style={{ borderRadius: '8px', width: 120 }}
                 disabled={!isAdmin}
               >
-                <IconifyIcon icon="solar:lock-password-bold" width={16} height={16} />
+                <IconifyIcon icon="solar:lock-password-bold" width={16} height={16} /> Disable App
               </Button>
             )}
             <Button

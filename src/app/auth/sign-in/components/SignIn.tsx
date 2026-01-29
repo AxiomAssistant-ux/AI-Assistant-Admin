@@ -210,7 +210,7 @@ const SignIn = () => {
                     Remember me
                   </label>
                 </div>
-                <Link href="/auth/reset-password" className="text-primary fw-medium">
+                <Link href="/auth/forgot-password" className="text-primary fw-medium">
                   Forgot password?
                 </Link>
               </div>
@@ -254,7 +254,7 @@ const SignIn = () => {
         </div>
       </div>
 
-      
+
     </div>
   )
 }

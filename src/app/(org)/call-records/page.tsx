@@ -641,7 +641,7 @@ const CallRecordsPage = () => {
       // },
       {
         key: "actions",
-        header: "Actions",
+        header: "Staff Actions",
         width: 160,
         align: "left",
         sticky: "right",
@@ -658,7 +658,8 @@ const CallRecordsPage = () => {
                 title="View Full Details"
                 style={{ borderRadius: '8px' }}
               >
-                <IconifyIcon icon="solar:eye-bold" width={16} height={16} />
+                {/* <IconifyIcon icon="solar:eye-bold" width={16} height={16} />  */}
+                View Report
               </Button>
 
               {call.recording_link ? (

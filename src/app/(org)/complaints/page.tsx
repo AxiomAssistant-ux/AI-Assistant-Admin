@@ -687,7 +687,6 @@ const ComplaintsPage = () => {
         width: 180,
         align: 'left',
         sticky: 'right',
-        defaultSticky: true,
         render: (complaint) => (
           <StatusDropdown
             currentStatus={complaint.status}
@@ -736,7 +735,7 @@ const ComplaintsPage = () => {
       },
       {
         key: 'actions',
-        header: 'Actions',
+        header: 'Staff Actions',
         width: 160,
         align: 'left',
         sticky: 'right',
@@ -753,7 +752,8 @@ const ComplaintsPage = () => {
                 title="View Full Details"
                 style={{ borderRadius: '8px' }}
               >
-                <IconifyIcon icon="solar:eye-bold" width={16} height={16} />
+                {/* <IconifyIcon icon="solar:eye-bold" width={16} height={16} /> */}
+                View
               </Button>
 
               {complaint.call_log_id ? (
